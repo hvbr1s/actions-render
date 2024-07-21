@@ -55,7 +55,7 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "node dist/app.ts",
+    "start": "node dist/app.js",
     "build": "tsc",
     "eject": "react-scripts eject",
     "dev": "nodemon"
