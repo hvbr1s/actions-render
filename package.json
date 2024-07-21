@@ -46,6 +46,7 @@
     },
     "scripts": {
         "start": "tsx ./src/app.ts",
+        "start:prod": "node dist/app.js",
         "build": "tsc",
         "eject": "react-scripts eject",
         "dev": "nodemon"
