@@ -402,7 +402,7 @@ app.get('/get_action', async (req, res) => {
           actions: [
             {
               label: "Mint NFT",
-              href: `http://localhost:8800/post_action?user_prompt={prompt}&memo={memo}`,
+              href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`,
               parameters: [
                 {
                   name: "prompt",
@@ -555,7 +555,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
 // Start the server
 app.listen(port, () => {
-  console.log(`Listening at http://localhost:${port}/`);
-  console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/devnet`)
+  console.log(`Listening at https://actions-55pw.onrender.com:${port}/`);
+  console.log(`Test your blinkshttps://actions-55pw.onrender.com:${port}/get_action \n at https://www.dial.to/devnet`)
 });
 export default app;
