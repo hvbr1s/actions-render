@@ -45,7 +45,7 @@
         "web-vitals": "^2.1.4"
     },
     "scripts": {
-        "start": "tsx ./src/app.ts --host 0.0.0.0 --port 8000",
+        "start": "tsx ./src/app.ts --host 0.0.0.0",
         "start:prod": "node dist/app.js",
         "build": "tsc",
         "eject": "react-scripts eject",
