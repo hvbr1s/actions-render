@@ -1,5 +1,5 @@
 // Node.js built-in modules
-import * as fs from 'graceful-fs';
+import * as fs from 'fs';
 import * as path from 'path';
 import fetch from 'node-fetch';
 
@@ -496,7 +496,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
         },
       });
 
-      res.header(ACTIONS_CORS_HEADERS).status(200).json(payload);
+      res.status(200).json(payload);
 
       const transactionSignature = await findTransactionWithMemo(connection, user_account, memo);
 
@@ -539,7 +539,6 @@ app.post('/post_action', async (req: Request, res: Response) => {
         console.log(`Transferring your NFT 📬`);
         const mintSend = await transferNFT(WALLET, user_account.toString(), mintAddress.toString());
         console.log(mintSend);
-        return res.status(200)
       } else {
         console.log('Transaction with memo not found within the timeout period');
       }
