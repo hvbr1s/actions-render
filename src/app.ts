@@ -51,7 +51,7 @@ dotenv.config();
 const app: express.Application = express();
 app.use(cors());
 // The port the express app will listen on
-const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8800;
+const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
 
 // Function to convert private key string to Uint8Array
 function getKeypairFromEnvironment(): Keypair {
@@ -554,8 +554,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
 });
 
 // Start the server
-app.listen(port, () => {
-  console.log(`Listening at https://actions-55pw.onrender.com:${port}/`);
-  console.log(`Test your blinkshttps://actions-55pw.onrender.com:${port}/get_action \n at https://www.dial.to/devnet`)
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server is running on http://0.0.0.0:${port}`);
 });
 export default app;
