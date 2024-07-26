@@ -11,6 +11,7 @@ import express, { Request, Response } from 'express';
 import Instructor from "@instructor-ai/instructor";
 import OpenAI from 'openai';
 import { z } from "zod";
+import Groq from "groq-sdk";
 
 // Solana-related imports
 import { 
@@ -50,8 +51,6 @@ dotenv.config();
 // Create a new express application instance
 const app: express.Application = express();
 app.use(cors());
-// The port the express app will listen on
-const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
 
 // Function to convert private key string to Uint8Array
 function getKeypairFromEnvironment(): Keypair {
@@ -83,11 +82,15 @@ const METAPLEX = Metaplex.make(SOLANA_CONNECTION)
 
 ///// AI LOGIC
 const oai_client = new OpenAI({apiKey: process.env['OPENAI_API_KEY']});
+const groq_client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const gpt_llm = "gpt-4o"
+const llama_llm = "llama-3.1-70b-versatile"
+
+
 
 // Prepare Instructor
 const instructor_client = Instructor({
-  client: oai_client,
+  client: groq_client,
   mode: "FUNCTIONS"
 })
 
@@ -105,7 +108,7 @@ async function safePrompting(userPrompt: string){
             content: userPrompt
         }
     ],
-    model: gpt_llm,
+    model: llama_llm,
     temperature: 0.0,
     response_model: { 
       schema: UserSchema, 
@@ -120,7 +123,7 @@ return safetyCheckResponse;
 }
 
 async function generatePrompt(userPrompt: string) {
-  const llmResponse = await oai_client.chat.completions.create({
+  const llmResponse = await groq_client.chat.completions.create({
       messages: [
           {
               role: "system",
@@ -142,7 +145,7 @@ async function generatePrompt(userPrompt: string) {
               content: userPrompt
           }
       ],
-      model: gpt_llm,
+      model: llama_llm,
       temperature: 0.5
   });
 
@@ -396,13 +399,14 @@ app.get('/get_action', async (req, res) => {
       const payload: ActionGetResponse = {
         icon: new URL("https://i.imgur.com/Frju6Dq.png").toString(),
         label: "Mint NFT",
-        title: "Imagin' App 🌈",
+        title: "Imagin'App 🌈",
         description: "Describe your own unique NFT",
         links: {
           actions: [
             {
               label: "Mint NFT",
-              href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`,
+              href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`, // prod href
+              //href: 'http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}', // dev href
               parameters: [
                 {
                   name: "prompt",
@@ -553,8 +557,18 @@ app.post('/post_action', async (req: Request, res: Response) => {
   }
 });
 
-// Start the server
+// The port the express app will listen on
+const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
+
+// Start prod server
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${port}`);
 });
 export default app;
+
+// Start dev server
+// app.listen(port, () => {
+//   console.log(`Listening at http://localhost:${port}/`);
+//   console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/devnet`)
+// });
+// export default app;
