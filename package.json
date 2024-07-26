@@ -11,8 +11,6 @@
         "@solana/spl-memo": "^0.2.5",
         "@types/jest": "^27.5.2",
         "@types/node": "^16.18.97",
-        "@types/react": "^18.3.2",
-        "@types/react-dom": "^18.3.0",
         "assert": "^2.1.0",
         "axios": "^1.7.0",
         "bn.js": "^5.2.1",
@@ -26,13 +24,12 @@
         "fs": "^0.0.1-security",
         "fs-extra": "^11.2.0",
         "graceful-fs": "^4.2.11",
+        "groq-sdk": "^0.5.0",
         "https-browserify": "^1.0.0",
         "instructor": "^1.0.0",
         "openai": "^4.47.1",
         "os-browserify": "^0.3.0",
         "path-browserify": "^1.0.1",
-        "react": "^18.3.1",
-        "react-dom": "^18.3.1",
         "react-scripts": "5.0.1",
         "socket.io": "^4.7.5",
         "stream-browserify": "^3.0.0",
@@ -41,15 +38,14 @@
         "ts-node": "^10.9.1",
         "typescript": "^4.7.4",
         "url": "^0.11.3",
-        "util": "^0.12.5",
-        "web-vitals": "^2.1.4"
+        "util": "^0.12.5"
     },
     "scripts": {
         "start": "tsx ./src/app.ts --host 0.0.0.0",
         "start:prod": "node dist/app.js",
         "build": "tsc",
         "eject": "react-scripts eject",
-        "dev": "nodemon"
+        "dev": "tsx ./src/app.ts"
     },
     "eslintConfig": {
         "extends": [
