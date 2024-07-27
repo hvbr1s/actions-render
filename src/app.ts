@@ -558,7 +558,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
 });
 
 // The port the express app will listen on
-const port: number = process.env.PORT ? parseInt(process.env.PORT) : 10000;
+const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
 
 // Start prod server
 app.listen(port, '0.0.0.0', () => {
