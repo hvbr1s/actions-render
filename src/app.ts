@@ -397,7 +397,7 @@ async function getFeeInLamports(connection: Connection): Promise<number> {
 app.get('/get_action', async (req, res) => {
     try {
       const payload: ActionGetResponse = {
-        icon: new URL("https://i.imgur.com/Frju6Dq.png").toString(),
+        icon: new URL("https://i.imgur.com/aFLHCnR.png").toString(),
         label: "Mint NFT",
         title: "Imagin'App 🌈",
         description: "Describe your own unique NFT",
