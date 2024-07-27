@@ -26,6 +26,7 @@ import { MEMO_PROGRAM_ID } from '@solana/spl-memo';
 import { 
   Connection, 
   ComputeBudgetProgram,
+  ComputeBudgetProgram,
   Keypair, 
   LAMPORTS_PER_SOL,
   PublicKey, 
@@ -299,9 +300,10 @@ async function transferNFT(
   senderKeypair: Keypair, 
   recipientPublicKey: string,
   mintAddress: string,
-  maxRetries = 10,
+  maxRetries = 2,
   retryDelay = 2000 // 2 seconds
 ) {
+  const senderAddress = senderKeypair.publicKey.toString();
   const senderAddress = senderKeypair.publicKey.toString();
   const destination = new PublicKey(recipientPublicKey);
   const mint = new PublicKey(mintAddress);
@@ -346,9 +348,9 @@ async function transferNFT(
       // If we reach here, the transfer was successful
       return {
         message: "Transfer successful!🥳",
-        sender: `https://explorer.solana.com/address/${senderAddress}`,
-        receiver: `https://explorer.solana.com/address/${recipientPublicKey}/tokens`,
-        transaction: `https://explorer.solana.com/tx/${sig2}`
+        sender: `https://explorer.solana.com/address/${senderAddress}?cluster=devnet`,
+        receiver: `https://explorer.solana.com/address/${recipientPublicKey}/tokens?cluster=devnet`,
+        transaction: `https://explorer.solana.com/tx/${sig2}?cluster=devnet`
       };
     } catch (error) {
       console.error(`Error in attempt ${attempt}:`, error);
@@ -362,9 +364,9 @@ async function transferNFT(
   throw new Error('Failed to transfer NFT after multiple attempts');
 }
 
-async function findTransactionWithMemo(connection: Connection, userAccount: PublicKey, memo: string): Promise<TransactionSignature | null> {
-  const maxChecks = 4;
-  let checkCount = 0;
+async function findTransactionWithMemo(connection: Connection, userAccount: PublicKey, memo: string, timeoutMinutes: number = 5): Promise<TransactionSignature | null> {
+  const startTime = Date.now();
+  const timeoutMs = timeoutMinutes * 60 * 1000;
 
   console.log(`Searching for memo: "${memo}"`);
 
@@ -424,14 +426,19 @@ app.get('/get_action', async (req, res) => {
       const payload: ActionGetResponse = {
         //icon: new URL("https://i.imgur.com/Frju6Dq.png").toString(), // elephant background
         icon: new URL("https://i.imgur.com/aFLHCnR.png").toString(), // kimono background
+        //icon: new URL("https://i.imgur.com/Frju6Dq.png").toString(), // elephant background
+        icon: new URL("https://i.imgur.com/aFLHCnR.png").toString(), // kimono background
         label: "Mint NFT",
+        title: "Imagin'App 🌈🏔️",
+        description: "Describe and mint your own unique NFT",
         title: "Imagin'App 🌈🏔️",
         description: "Describe and mint your own unique NFT",
         links: {
           actions: [
             {
               label: "Mint NFT",
-              href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`, // prod href
+              //href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`, // prod href
+              href: 'http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}', // dev href
               parameters: [
                 {
                   name: "prompt",
@@ -446,6 +453,10 @@ app.get('/get_action', async (req, res) => {
               ]
             }
           ]
+        },
+        error:{
+          message: "⚠️ A single mint costs $10 USD, payable in SOL.\nThis blink is still in beta, use at your own risks!"
+        },
         },
         error:{
           message: "⚠️ A single mint costs $10 USD, payable in SOL.\nThis blink is still in beta, use at your own risks!"
@@ -520,8 +531,8 @@ app.post('/post_action', async (req: Request, res: Response) => {
       );
 
       // Set computational resources for transaction
-      transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
-      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }))
+      transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }))
+      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1_000_000 }))
 
       // Set transaction's blockchash and fee payer
       transaction.recentBlockhash = blockhash;
@@ -595,8 +606,15 @@ app.post('/post_action', async (req: Request, res: Response) => {
 const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
 
 // Start prod server
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Server is running on http://0.0.0.0:${port}`);
-  console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/devnet`)
+// app.listen(port, '0.0.0.0', () => {
+//   console.log(`Server is running on http://0.0.0.0:${port}`);
+//   console.log(`Test your blinks https://actions-55pw.onrender.com/post_action \n at https://www.dial.to/devnet`)
+// });
+// export default app;
+
+// Start dev server
+app.listen(port, () => {
+  console.log(`Listening at http://localhost:${port}/`);
+  console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/devnet`)
 });
 export default app;
