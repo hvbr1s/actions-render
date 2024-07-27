@@ -156,7 +156,7 @@ async function generatePrompt(userPrompt: string) {
   return parsedresponse;
 }
 
-async function defineConfig(llmPrompt: string, randomNumber: number, memo: string) {
+async function defineConfig(llmPrompt: string, randomNumber: number) {
   const nftAttributes = await oai_client.chat.completions.create({
     messages: [
         {
@@ -199,8 +199,7 @@ async function defineConfig(llmPrompt: string, randomNumber: number, memo: strin
     description: llmResponse.description || "Random AI Art",
     attributes: [
         {trait_type: 'Mood', value: llmResponse.mood ||''},
-        {trait_type: 'Haiku', value:llmResponse.haiku ||''},
-        {trait_type: 'Note', value: memo ||''},
+        {trait_type: 'Haiku', value:llmResponse.haiku ||''}
     ],
     sellerFeeBasisPoints: 500, // 500 bp = 5%
     symbol: 'AIART',
@@ -486,10 +485,12 @@ app.post('/post_action', async (req: Request, res: Response) => {
   const randomNumber = Math.floor(Math.random() * 10000);
 
   try {
+    
     const prompt = (req.query.user_prompt as string || '').trim();
     console.log('User prompt:', prompt);
-    const memo = (req.query.memo as string || '').trim();
-    console.log('User memo: ', memo)
+    const pre_memo = (req.query.memo as string || '').trim();
+    const memo = pre_memo + randomNumber.toString()
+    console.log('User random memo: ', memo)
     const body: ActionPostRequest = req.body;
 
     const safetyCheck = await safePrompting(prompt);
@@ -536,8 +537,8 @@ app.post('/post_action', async (req: Request, res: Response) => {
       );
 
       // Set computational resources for transaction
-      transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }))
-      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 }))
+      transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
+      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }))
 
       // Set transaction's blockchash and fee payer
       transaction.recentBlockhash = blockhash;
@@ -561,7 +562,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
         const llmSays = await generatePrompt(prompt);
         console.log(`LLM prompt 🤖-> ${llmSays}`);
 
-        const CONFIG = await defineConfig(llmSays, randomNumber, memo);
+        const CONFIG = await defineConfig(llmSays, randomNumber);
         const imageName = `'${CONFIG.imgName}'`
         console.log(`Image Name -> ${imageName}`)
         
