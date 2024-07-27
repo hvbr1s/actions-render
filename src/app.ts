@@ -415,13 +415,16 @@ app.get('/get_action', async (req, res) => {
                 },
                 {
                   name: "memo",
-                  label: "Add a note",
+                  label: "Add a personal note",
                   required: true,
                 }
               ]
             }
           ]
         }
+        error:{
+          message: "⚠️ A single mint costs $10 USD, payable in SOL.\nThis blink is still in beta, use at your own risks!"
+        },
       };
   
       res.header(ACTIONS_CORS_HEADERS).status(200).json(payload);
