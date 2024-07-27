@@ -423,7 +423,7 @@ async function getFeeInLamports(connection: Connection): Promise<number> {
   const solPrice = data.solana.usd;
 
   // 2. Calculate SOL equivalent of n USD
-  const solAmount = 1 / solPrice;
+  const solAmount = 8 / solPrice;
 
   // 3. Convert SOL to lamports
   const lamports = solAmount * LAMPORTS_PER_SOL;
