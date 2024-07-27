@@ -423,8 +423,8 @@ async function getFeeInLamports(connection: Connection): Promise<number> {
   const data = await response.json();
   const solPrice = data.solana.usd;
 
-  // 2. Calculate SOL equivalent of 10 USD
-  const solAmount = 10 / solPrice;
+  // 2. Calculate SOL equivalent of 7 USD
+  const solAmount = 7 / solPrice;
 
   // 3. Convert SOL to lamports
   const lamports = solAmount * LAMPORTS_PER_SOL;
@@ -434,7 +434,6 @@ async function getFeeInLamports(connection: Connection): Promise<number> {
 }
 
 ///////// API ROUTES
-
 app.get('/get_action', async (req, res) => {
     try {
       const payload: ActionGetResponse = {
@@ -477,7 +476,8 @@ app.get('/get_action', async (req, res) => {
 });
 
 app.options('/post_action', (req: Request, res: Response) => {
-  res.header(ACTIONS_CORS_HEADERS).sendStatus(200);
+  // res.header(ACTIONS_CORS_HEADERS).sendStatus(200);
+  res.header(ACTIONS_CORS_HEADERS).status(200);
 });
 
 app.use(express.json());
