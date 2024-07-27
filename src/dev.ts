@@ -69,16 +69,14 @@ function getKeypairFromEnvironment(): Keypair {
 }
 
 // Initiate sender wallet and connection to Solana
-// const HELIUS_KEY = process.env.HELIUS_API_KEY
-// //const HELIUS_MAINNET_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`;
-const QUICKNODE_RPC = 'https://fragrant-ancient-needle.solana-devnet.quiknode.pro/71caf4b466e52b402cb9891702899d7631646396/';
+const QUICKNODE_KEY = process.env.QUICKNODE_RPC_KEY
+const QUICKNODE_RPC = `https://fragrant-ancient-needle.solana-devnet.quiknode.pro/${QUICKNODE_KEY}/`;
 const SOLANA_CONNECTION = new Connection(QUICKNODE_RPC);
 const WALLET = getKeypairFromEnvironment();
 const METAPLEX = Metaplex.make(SOLANA_CONNECTION)
     .use(keypairIdentity(WALLET))
     .use(bundlrStorage({
         address: 'https://devnet.bundlr.network', // Devnet
-        //address: 'https://node1.bundlr.network', // Mainnet
         providerUrl: QUICKNODE_RPC,
         timeout: 60000,
     }));
@@ -437,7 +435,6 @@ app.get('/get_action', async (req, res) => {
           actions: [
             {
               label: "Mint NFT",
-              //href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`, // prod href
               href: 'http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}', // dev href
               parameters: [
                 {
