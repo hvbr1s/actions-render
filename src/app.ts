@@ -616,10 +616,3 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/devnet`)
 });
 export default app;
-
-// Start dev server
-// app.listen(port, () => {
-//   console.log(`Listening at http://localhost:${port}/`);
-//   console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/devnet`)
-// });
-// export default app;
