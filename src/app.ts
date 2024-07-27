@@ -263,50 +263,41 @@ async function uploadMetadata(imgUri: string, imgType: string, nftName: string, 
 }
 
 async function mintProgrammableNft(
-  metadataUri: string,
-  name: string,
-  sellerFee: number,
-  symbol: string,
-  creators: { address: PublicKey, share: number }[]
-)
-{
-  try {
-    const transactionBuilder = await METAPLEX
-    .nfts()
-    .builders()
-    .create({
-        uri: metadataUri,
-        name: name,
-        sellerFeeBasisPoints: sellerFee,
-        symbol: symbol,
-        creators: creators,
-        isMutable: true,
-        isCollection: false,
-        tokenStandard: TokenStandard.ProgrammableNonFungible,
-        ruleSet: null
-    });
-    await METAPLEX.nfts().create({
-        uri: metadataUri,
-        name: name,
-        sellerFeeBasisPoints: sellerFee,
-        symbol: symbol,
-        creators: creators,
-        isMutable: false,
-    });
-    let { signature, confirmResponse } = await METAPLEX.rpc().sendAndConfirmTransaction(transactionBuilder);
-    if (confirmResponse.value.err) {
-        throw new Error('failed to confirm transaction');
+    metadataUri: string,
+    name: string,
+    sellerFee: number,
+    symbol: string,
+    creators: { address: PublicKey, share: number }[]
+  ) {
+    try {
+      const transactionBuilder = await METAPLEX
+        .nfts()
+        .builders()
+        .create({
+          uri: metadataUri,
+          name,
+          sellerFeeBasisPoints: sellerFee,
+          symbol,
+          creators,
+          isMutable: true,
+          isCollection: false,
+          tokenStandard: TokenStandard.ProgrammableNonFungible,
+          ruleSet: null
+        });
+  
+      const { signature } = await METAPLEX.rpc().sendAndConfirmTransaction(transactionBuilder);
+      const { mintAddress } = transactionBuilder.getContext();
+  
+      console.log(`Mint successful! 🎉`);
+      console.log(`Minted NFT: https://explorer.solana.com/address/${mintAddress.toString()}`);
+      console.log(`Mint transaction: https://explorer.solana.com/tx/${signature}`);
+  
+      return mintAddress;
+    } catch (err) {
+      console.error('Minting failed:', err);
+      throw err;
     }
-    const { mintAddress } = transactionBuilder.getContext();
-    console.log(`   Mint successful!🎉`);
-    console.log(`   Minted NFT:       https://explorer.solana.com/address/${mintAddress.toString()}`);
-    console.log(`   Mint transaction: https://explorer.solana.com/tx/${signature}`);
-    return mintAddress
   }
-  catch (err) {
-    console.log(err);
-  }
-}
 
 // Transfer function 
 async function transferNFT(
@@ -423,7 +414,7 @@ async function getFeeInLamports(connection: Connection): Promise<number> {
   const solPrice = data.solana.usd;
 
   // 2. Calculate SOL equivalent of n USD
-  const solAmount = 8 / solPrice;
+  const solAmount = 1 / solPrice;
 
   // 3. Convert SOL to lamports
   const lamports = solAmount * LAMPORTS_PER_SOL;
