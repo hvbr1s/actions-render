@@ -76,7 +76,6 @@ const WALLET = getKeypairFromEnvironment();
 const METAPLEX = Metaplex.make(SOLANA_CONNECTION)
     .use(keypairIdentity(WALLET))
     .use(bundlrStorage({
-        //address: 'https://devnet.bundlr.network', // Devnet
         address: 'https://node1.bundlr.network', // Mainnet
         providerUrl: QUICKNODE_RPC,
         timeout: 60000,
@@ -155,7 +154,7 @@ async function generatePrompt(userPrompt: string) {
   return parsedresponse;
 }
 
-async function defineConfig(llmPrompt: string, randomNumber: number) {
+async function defineConfig(llmPrompt: string, randomNumber: number, memo: string) {
   const nftAttributes = await oai_client.chat.completions.create({
     messages: [
         {
@@ -197,8 +196,8 @@ async function defineConfig(llmPrompt: string, randomNumber: number) {
     imgName: llmResponse.one_word_title || 'Art', 
     description: llmResponse.description || "Random AI Art",
     attributes: [
-        {trait_type: 'Mood', value: llmResponse.mood ||''},
-        {trait_type: 'Haiku', value:llmResponse.haiku ||''}
+        {trait_type: 'Haiku', value:llmResponse.haiku ||''},
+        {trait_type: 'Note', value: memo ||''}
     ],
     sellerFeeBasisPoints: 500, // 500 bp = 5%
     symbol: 'AIART',
@@ -436,7 +435,6 @@ app.get('/get_action', async (req, res) => {
             {
               label: "Mint NFT",
               href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`, // prod href
-              //href: 'http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}', // dev href
               parameters: [
                 {
                   name: "prompt",
@@ -495,7 +493,6 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
       const connection = new Connection(
         process.env.SOLANA_RPC! || clusterApiUrl("mainnet-beta"),
-        //process.env.SOLANA_RPC! || clusterApiUrl("devnet"),
       );
 
       const transaction = new Transaction();
@@ -552,7 +549,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
         const llmSays = await generatePrompt(prompt);
         console.log(`LLM prompt 🤖-> ${llmSays}`);
 
-        const CONFIG = await defineConfig(llmSays, randomNumber);
+        const CONFIG = await defineConfig(llmSays, randomNumber, pre_memo);
         const imageName = `'${CONFIG.imgName}'`
         console.log(`Image Name -> ${imageName}`)
         
