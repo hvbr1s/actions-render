@@ -156,7 +156,7 @@ async function generatePrompt(userPrompt: string) {
   return parsedresponse;
 }
 
-async function defineConfig(llmPrompt: string, randomNumber: number) {
+async function defineConfig(llmPrompt: string, randomNumber: number, memo: string) {
   const nftAttributes = await oai_client.chat.completions.create({
     messages: [
         {
@@ -199,6 +199,7 @@ async function defineConfig(llmPrompt: string, randomNumber: number) {
     description: llmResponse.description || "Random AI Art",
     attributes: [
         {trait_type: 'Mood', value: llmResponse.mood ||''},
+        {trait_type: 'Haiku', value:llmResponse.haiku ||''},
         {trait_type: 'Haiku', value:llmResponse.haiku ||''}
     ],
     sellerFeeBasisPoints: 500, // 500 bp = 5%
@@ -263,50 +264,41 @@ async function uploadMetadata(imgUri: string, imgType: string, nftName: string, 
 }
 
 async function mintProgrammableNft(
-  metadataUri: string,
-  name: string,
-  sellerFee: number,
-  symbol: string,
-  creators: { address: PublicKey, share: number }[]
-)
-{
-  try {
-    const transactionBuilder = await METAPLEX
-    .nfts()
-    .builders()
-    .create({
-        uri: metadataUri,
-        name: name,
-        sellerFeeBasisPoints: sellerFee,
-        symbol: symbol,
-        creators: creators,
-        isMutable: true,
-        isCollection: false,
-        tokenStandard: TokenStandard.ProgrammableNonFungible,
-        ruleSet: null
-    });
-    await METAPLEX.nfts().create({
-        uri: metadataUri,
-        name: name,
-        sellerFeeBasisPoints: sellerFee,
-        symbol: symbol,
-        creators: creators,
-        isMutable: false,
-    });
-    let { signature, confirmResponse } = await METAPLEX.rpc().sendAndConfirmTransaction(transactionBuilder);
-    if (confirmResponse.value.err) {
-        throw new Error('failed to confirm transaction');
+    metadataUri: string,
+    name: string,
+    sellerFee: number,
+    symbol: string,
+    creators: { address: PublicKey, share: number }[]
+  ) {
+    try {
+      const transactionBuilder = await METAPLEX
+        .nfts()
+        .builders()
+        .create({
+          uri: metadataUri,
+          name,
+          sellerFeeBasisPoints: sellerFee,
+          symbol,
+          creators,
+          isMutable: true,
+          isCollection: false,
+          tokenStandard: TokenStandard.ProgrammableNonFungible,
+          ruleSet: null
+        });
+  
+      const { signature } = await METAPLEX.rpc().sendAndConfirmTransaction(transactionBuilder);
+      const { mintAddress } = transactionBuilder.getContext();
+  
+      console.log(`Mint successful! 🎉`);
+      console.log(`Minted NFT: https://explorer.solana.com/address/${mintAddress.toString()}`);
+      console.log(`Mint transaction: https://explorer.solana.com/tx/${signature}`);
+  
+      return mintAddress;
+    } catch (err) {
+      console.error('Minting failed:', err);
+      throw err;
     }
-    const { mintAddress } = transactionBuilder.getContext();
-    console.log(`   Mint successful!🎉`);
-    console.log(`   Minted NFT:       https://explorer.solana.com/address/${mintAddress.toString()}`);
-    console.log(`   Mint transaction: https://explorer.solana.com/tx/${signature}`);
-    return mintAddress
   }
-  catch (err) {
-    console.log(err);
-  }
-}
 
 // Transfer function 
 async function transferNFT(
@@ -455,7 +447,7 @@ app.get('/get_action', async (req, res) => {
                 },
                 {
                   name: "memo",
-                  label: "Add a note",
+                  label: "Add a personal note",
                   required: true,
                 }
               ]
@@ -562,7 +554,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
         const llmSays = await generatePrompt(prompt);
         console.log(`LLM prompt 🤖-> ${llmSays}`);
 
-        const CONFIG = await defineConfig(llmSays, randomNumber);
+        const CONFIG = await defineConfig(llmSays, randomNumber, pre_memo);
         const imageName = `'${CONFIG.imgName}'`
         console.log(`Image Name -> ${imageName}`)
         
@@ -610,13 +602,6 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
 // The port the express app will listen on
 const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
-
-// Start prod server
-// app.listen(port, '0.0.0.0', () => {
-//   console.log(`Server is running on http://0.0.0.0:${port}`);
-//   console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/devnet`)
-// });
-// export default app;
 
 // Start dev server
 app.listen(port, () => {
