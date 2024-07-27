@@ -314,7 +314,7 @@ async function transferNFT(
   senderKeypair: Keypair, 
   recipientPublicKey: string,
   mintAddress: string,
-  maxRetries = 2,
+  maxRetries = 10,
   retryDelay = 2000 // 2 seconds
 ) {
   const senderAddress = senderKeypair.publicKey.toString();
@@ -377,13 +377,15 @@ async function transferNFT(
   throw new Error('Failed to transfer NFT after multiple attempts');
 }
 
-async function findTransactionWithMemo(connection: Connection, userAccount: PublicKey, memo: string, timeoutMinutes: number = 5): Promise<TransactionSignature | null> {
-  const startTime = Date.now();
-  const timeoutMs = timeoutMinutes * 60 * 1000;
+async function findTransactionWithMemo(connection: Connection, userAccount: PublicKey, memo: string): Promise<TransactionSignature | null> {
+  const maxChecks = 10;
+  let checkCount = 0;
 
   console.log(`Searching for memo: "${memo}"`);
 
-  while (Date.now() - startTime < timeoutMs) {
+  while (checkCount < maxChecks) {
+    console.log(`Check ${checkCount + 1} of ${maxChecks}`);
+    
     const signatures = await connection.getSignaturesForAddress(userAccount, 
       { limit: 5 },
       'confirmed'
@@ -402,11 +404,15 @@ async function findTransactionWithMemo(connection: Connection, userAccount: Publ
       }
     }
 
-    console.log("Waiting 5 seconds before next check...");
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    checkCount++;
+
+    if (checkCount < maxChecks) {
+      console.log("Waiting 5 seconds before next check...");
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
   }
 
-  console.log("Timeout reached, no matching memo found");
+  console.log("Maximum checks reached, no matching memo found");
   return null;
 }
 
