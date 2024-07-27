@@ -2,6 +2,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import fetch from 'node-fetch';
+import { sleep } from "./utils/sleep";
 
 // Third-party modules
 import axios from 'axios';
@@ -310,35 +311,64 @@ async function mintProgrammableNft(
 async function transferNFT(
   senderKeypair: Keypair, 
   recipientPublicKey: string,
-  mintAddress: string
+  mintAddress: string,
+  maxRetries = 2,
+  retryDelay = 2000 // 2 seconds
 ) {
-  const senderAddress = senderKeypair.publicKey.toString()
+  const senderAddress = senderKeypair.publicKey.toString();
   const destination = new PublicKey(recipientPublicKey);
-  const mint = new PublicKey(mintAddress)
-  const accountInfo = await SOLANA_CONNECTION.getAccountInfo(new PublicKey(mint));
-  if (accountInfo) {
-    console.log(`Current Owner of the NFT: ${accountInfo.owner.toString()}`);
-  } else {
-    console.log('Account info is null.');
-  }
-  const transferTransactionBuilder = await METAPLEX.nfts().builders().transfer({
-      nftOrSft: {address: mint, tokenStandard: TokenStandard.ProgrammableNonFungible},
-      authority: WALLET,
-      fromOwner: WALLET.publicKey,
-      toOwner: destination,
-  });
-  
-  let { signature: sig2, confirmResponse: res2 } = await METAPLEX.rpc().sendAndConfirmTransaction(transferTransactionBuilder, {commitment: 'finalized'});
-  if (res2.value.err) {
-      throw new Error('Failed to confirm transfer transaction');
-  }
-  else
-    return {
-      message: "Transfer successful!🥳",
-      sender: `https://explorer.solana.com/address/${senderAddress}?cluster=devnet`,
-      receiver: `https://explorer.solana.com/address/${recipientPublicKey}/tokens?cluster=devnet`,
-      transaction: `https://explorer.solana.com/tx/${sig2}?cluster=devnet`
+  const mint = new PublicKey(mintAddress);
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Attempt ${attempt} to transfer NFT`);
+
+      // Check if the mint account exists
+      const accountInfo = await SOLANA_CONNECTION.getAccountInfo(mint);
+      if (!accountInfo) {
+        console.log('Mint account does not exist. Retrying...');
+        await sleep(retryDelay);
+        continue;
+      }
+
+      console.log(`Current Owner of the NFT: ${accountInfo.owner.toString()}`);
+
+      // Check if the sender owns the NFT
+      const tokenAccounts = await SOLANA_CONNECTION.getTokenAccountsByOwner(senderKeypair.publicKey, { mint });
+      if (tokenAccounts.value.length === 0) {
+        throw new Error('Sender does not own the NFT');
+      }
+      // Build and send the transfer transaction
+      const transferTransactionBuilder = await METAPLEX.nfts().builders().transfer({
+        nftOrSft: {address: mint, tokenStandard: TokenStandard.ProgrammableNonFungible},
+        authority: WALLET,
+        fromOwner: WALLET.publicKey,
+        toOwner: destination,
+      });
+      const { signature: sig2, confirmResponse: res2 } = await METAPLEX.rpc().sendAndConfirmTransaction(
+        transferTransactionBuilder, 
+        { commitment: 'finalized' }
+      );
+
+      if (res2.value.err) {
+        throw new Error('Failed to confirm transfer transaction');
+      }
+      // If we reach here, the transfer was successful
+      return {
+        message: "Transfer successful!🥳",
+        sender: `https://explorer.solana.com/address/${senderAddress}?cluster=devnet`,
+        receiver: `https://explorer.solana.com/address/${recipientPublicKey}/tokens?cluster=devnet`,
+        transaction: `https://explorer.solana.com/tx/${sig2}?cluster=devnet`
+      };
+    } catch (error) {
+      console.error(`Error in attempt ${attempt}:`, error);
+      if (attempt === maxRetries) {
+        throw error; // Rethrow the error if we've exhausted all retries
+      }
+      await sleep(retryDelay);
     }
+  }
+  throw new Error('Failed to transfer NFT after multiple attempts');
 }
 
 async function findTransactionWithMemo(connection: Connection, userAccount: PublicKey, memo: string, timeoutMinutes: number = 5): Promise<TransactionSignature | null> {
