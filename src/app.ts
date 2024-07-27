@@ -87,7 +87,6 @@ const gpt_llm = "gpt-4o"
 const llama_llm = "llama-3.1-70b-versatile"
 
 
-
 // Prepare Instructor
 const instructor_client = Instructor({
   client: groq_client,
@@ -401,13 +400,13 @@ app.get('/get_action', async (req, res) => {
         icon: new URL("https://i.imgur.com/aFLHCnR.png").toString(), // kimono background
         label: "Mint NFT",
         title: "Imagin'App 🌈🏔️",
-        description: "Describe your own unique NFT",
+        description: "Describe and mint your own unique NFT",
         links: {
           actions: [
             {
               label: "Mint NFT",
               href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`, // prod href
-              //href: 'http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}', // dev href
+              //href: 'http://localhost:10000/post_action?user_prompt={prompt}&memo={memo}', // dev href
               parameters: [
                 {
                   name: "prompt",
@@ -559,11 +558,12 @@ app.post('/post_action', async (req: Request, res: Response) => {
 });
 
 // The port the express app will listen on
-const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
+const port: number = process.env.PORT ? parseInt(process.env.PORT) : 10000;
 
 // Start prod server
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${port}`);
+  console.log(`Test your blinks https://actions-55pw.onrender.com/post_action \n at https://www.dial.to/devnet`)
 });
 export default app;
 
