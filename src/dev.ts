@@ -196,9 +196,8 @@ async function defineConfig(llmPrompt: string, randomNumber: number, memo: strin
     imgName: llmResponse.one_word_title || 'Art', 
     description: llmResponse.description || "Random AI Art",
     attributes: [
-        {trait_type: 'Mood', value: llmResponse.mood ||''},
         {trait_type: 'Haiku', value:llmResponse.haiku ||''},
-        {trait_type: 'Haiku', value:llmResponse.haiku ||''}
+        {trait_type: 'Note', value: memo ||''}
     ],
     sellerFeeBasisPoints: 500, // 500 bp = 5%
     symbol: 'AIART',
