@@ -69,9 +69,8 @@ function getKeypairFromEnvironment(): Keypair {
 }
 
 // Initiate sender wallet and connection to Solana
-// const HELIUS_KEY = process.env.HELIUS_API_KEY
-// const HELIUS_MAINNET_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`;
-const QUICKNODE_RPC = 'https://winter-solemn-sun.solana-mainnet.quiknode.pro/64d6f6605dbfdf7be66c6bf2efebe7dc6e474bde/';
+const QUICKNODE_KEY = process.env.QUICKNODE_RPC_KEY
+const QUICKNODE_RPC = `https://winter-solemn-sun.solana-mainnet.quiknode.pro/${QUICKNODE_KEY}/`;
 const SOLANA_CONNECTION = new Connection(QUICKNODE_RPC);
 const WALLET = getKeypairFromEnvironment();
 const METAPLEX = Metaplex.make(SOLANA_CONNECTION)
