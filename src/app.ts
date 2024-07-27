@@ -69,18 +69,20 @@ function getKeypairFromEnvironment(): Keypair {
 }
 
 // Initiate sender wallet and connection to Solana
-const QUICKNODE_RPC = 'https://fragrant-ancient-needle.solana-devnet.quiknode.pro/71caf4b466e52b402cb9891702899d7631646396/';
-const SOLANA_CONNECTION = new Connection(QUICKNODE_RPC);
+const HELIUS_KEY = process.env.HELIUS_API_KEY
+const HELIUS_MAINNET_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`;
+console.log(HELIUS_MAINNET_RPC)
+//const QUICKNODE_RPC = 'https://fragrant-ancient-needle.solana-devnet.quiknode.pro/71caf4b466e52b402cb9891702899d7631646396/';
+const SOLANA_CONNECTION = new Connection(HELIUS_MAINNET_RPC);
 const WALLET = getKeypairFromEnvironment();
 const METAPLEX = Metaplex.make(SOLANA_CONNECTION)
     .use(keypairIdentity(WALLET))
     .use(bundlrStorage({
         //address: 'https://devnet.bundlr.network', // Devnet
         address: 'https://node1.bundlr.network', // Mainnet
-        providerUrl: QUICKNODE_RPC,
+        providerUrl: HELIUS_MAINNET_RPC,
         timeout: 60000,
     }));
-
 
 ///// AI LOGIC
 const oai_client = new OpenAI({apiKey: process.env['OPENAI_API_KEY']});
@@ -605,7 +607,7 @@ const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
 // Start prod server
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${port}`);
-  console.log(`Test your blinks https://actions-55pw.onrender.com/post_action \n at https://www.dial.to/devnet`)
+  console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/devnet`)
 });
 export default app;
 
