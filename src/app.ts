@@ -45,7 +45,7 @@ import {
 } from "@metaplex-foundation/js";
 import { TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
 
-const TREASURY_WALLET = new PublicKey('D1TJBeqCo91pUFFbNbTm2qjCCy6FzQEoFtGKUQhrpCuK');
+const TREASURY_WALLET = new PublicKey('AXP4CzLGxxHtXSJYh5Vzw9S8msoNR5xzpsgfMdFd11W1');
 
 // Load environment variable
 dotenv.config();
