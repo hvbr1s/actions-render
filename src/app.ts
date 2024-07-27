@@ -25,6 +25,7 @@ import {
 import { MEMO_PROGRAM_ID } from '@solana/spl-memo';
 import { 
   Connection, 
+  ComputeBudgetProgram,
   Keypair, 
   LAMPORTS_PER_SOL,
   PublicKey, 
@@ -44,7 +45,7 @@ import {
 } from "@metaplex-foundation/js";
 import { TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
 
-const TREASURY_ADDRESS = new PublicKey('3crhbDnPJU9xvvhUwEs8WXPqAcA9aovsbj6aRBX9bNbw');
+const TREASURY_WALLET = new PublicKey('D1TJBeqCo91pUFFbNbTm2qjCCy6FzQEoFtGKUQhrpCuK');
 
 // Load environment variable
 dotenv.config();
@@ -74,8 +75,8 @@ const WALLET = getKeypairFromEnvironment();
 const METAPLEX = Metaplex.make(SOLANA_CONNECTION)
     .use(keypairIdentity(WALLET))
     .use(bundlrStorage({
-        address: 'https://devnet.bundlr.network', // Devnet
-        //address: 'https://node1.bundlr.network', // Mainnet
+        //address: 'https://devnet.bundlr.network', // Devnet
+        address: 'https://node1.bundlr.network', // Mainnet
         providerUrl: QUICKNODE_RPC,
         timeout: 60000,
     }));
@@ -298,8 +299,8 @@ async function mintProgrammableNft(
     }
     const { mintAddress } = transactionBuilder.getContext();
     console.log(`   Mint successful!🎉`);
-    console.log(`   Minted NFT:       https://explorer.solana.com/address/${mintAddress.toString()}?cluster=devnet`);
-    console.log(`   Mint transaction: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+    console.log(`   Minted NFT:       https://explorer.solana.com/address/${mintAddress.toString()}`);
+    console.log(`   Mint transaction: https://explorer.solana.com/tx/${signature}`);
     return mintAddress
   }
   catch (err) {
@@ -338,6 +339,7 @@ async function transferNFT(
       if (tokenAccounts.value.length === 0) {
         throw new Error('Sender does not own the NFT');
       }
+
       // Build and send the transfer transaction
       const transferTransactionBuilder = await METAPLEX.nfts().builders().transfer({
         nftOrSft: {address: mint, tokenStandard: TokenStandard.ProgrammableNonFungible},
@@ -345,6 +347,7 @@ async function transferNFT(
         fromOwner: WALLET.publicKey,
         toOwner: destination,
       });
+
       const { signature: sig2, confirmResponse: res2 } = await METAPLEX.rpc().sendAndConfirmTransaction(
         transferTransactionBuilder, 
         { commitment: 'finalized' }
@@ -353,12 +356,13 @@ async function transferNFT(
       if (res2.value.err) {
         throw new Error('Failed to confirm transfer transaction');
       }
+
       // If we reach here, the transfer was successful
       return {
         message: "Transfer successful!🥳",
-        sender: `https://explorer.solana.com/address/${senderAddress}?cluster=devnet`,
-        receiver: `https://explorer.solana.com/address/${recipientPublicKey}/tokens?cluster=devnet`,
-        transaction: `https://explorer.solana.com/tx/${sig2}?cluster=devnet`
+        sender: `https://explorer.solana.com/address/${senderAddress}`,
+        receiver: `https://explorer.solana.com/address/${recipientPublicKey}/tokens`,
+        transaction: `https://explorer.solana.com/tx/${sig2}`
       };
     } catch (error) {
       console.error(`Error in attempt ${attempt}:`, error);
@@ -368,6 +372,7 @@ async function transferNFT(
       await sleep(retryDelay);
     }
   }
+
   throw new Error('Failed to transfer NFT after multiple attempts');
 }
 
@@ -436,7 +441,7 @@ app.get('/get_action', async (req, res) => {
             {
               label: "Mint NFT",
               href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`, // prod href
-              //href: 'http://localhost:10000/post_action?user_prompt={prompt}&memo={memo}', // dev href
+              //href: 'http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}', // dev href
               parameters: [
                 {
                   name: "prompt",
@@ -445,7 +450,7 @@ app.get('/get_action', async (req, res) => {
                 },
                 {
                   name: "memo",
-                  label: "Add a personal note",
+                  label: "Add a note",
                   required: true,
                 }
               ]
@@ -491,8 +496,8 @@ app.post('/post_action', async (req: Request, res: Response) => {
       }
 
       const connection = new Connection(
-        // process.env.SOLANA_RPC! || clusterApiUrl("mainnet-beta"),
-        process.env.SOLANA_RPC! || clusterApiUrl("devnet"),
+        process.env.SOLANA_RPC! || clusterApiUrl("mainnet-beta"),
+        //process.env.SOLANA_RPC! || clusterApiUrl("devnet"),
       );
 
       const transaction = new Transaction();
@@ -508,7 +513,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: user_account,
-          toPubkey: TREASURY_ADDRESS,
+          toPubkey: TREASURY_WALLET,
           lamports: mintingFee,
         })
       );
@@ -522,7 +527,11 @@ app.post('/post_action', async (req: Request, res: Response) => {
         })
       );
 
-      // Set the transaction properties
+      // Set computational resources for transaction
+      transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }))
+      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1_000_000 }))
+
+      // Set transaction's blockchash and fee payer
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = user_account;
 
