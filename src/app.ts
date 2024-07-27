@@ -514,7 +514,8 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
       // Get fee price
       const mintingFee =  await getFeeInLamports(connection);
-      console.log(`Fee for this transaction -> ${mintingFee} lamports or `)
+      const mintingFeeSOL = mintingFee / LAMPORTS_PER_SOL;
+      console.log(`Fee for this transaction -> ${mintingFee} lamports or ${mintingFeeSOL} SOL.`)
 
       // Adding payment
       transaction.add(
