@@ -69,17 +69,17 @@ function getKeypairFromEnvironment(): Keypair {
 }
 
 // Initiate sender wallet and connection to Solana
-const HELIUS_KEY = process.env.HELIUS_API_KEY
-const HELIUS_MAINNET_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`;
-//const QUICKNODE_RPC = 'https://fragrant-ancient-needle.solana-devnet.quiknode.pro/71caf4b466e52b402cb9891702899d7631646396/';
-const SOLANA_CONNECTION = new Connection(HELIUS_MAINNET_RPC);
+// const HELIUS_KEY = process.env.HELIUS_API_KEY
+// const HELIUS_MAINNET_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`;
+const QUICKNODE_RPC = 'https://winter-solemn-sun.solana-mainnet.quiknode.pro/64d6f6605dbfdf7be66c6bf2efebe7dc6e474bde/';
+const SOLANA_CONNECTION = new Connection(QUICKNODE_RPC);
 const WALLET = getKeypairFromEnvironment();
 const METAPLEX = Metaplex.make(SOLANA_CONNECTION)
     .use(keypairIdentity(WALLET))
     .use(bundlrStorage({
         //address: 'https://devnet.bundlr.network', // Devnet
         address: 'https://node1.bundlr.network', // Mainnet
-        providerUrl: HELIUS_MAINNET_RPC,
+        providerUrl: QUICKNODE_RPC,
         timeout: 60000,
     }));
 
