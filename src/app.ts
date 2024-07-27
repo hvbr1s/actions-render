@@ -71,7 +71,6 @@ function getKeypairFromEnvironment(): Keypair {
 // Initiate sender wallet and connection to Solana
 const HELIUS_KEY = process.env.HELIUS_API_KEY
 const HELIUS_MAINNET_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`;
-console.log(HELIUS_MAINNET_RPC)
 //const QUICKNODE_RPC = 'https://fragrant-ancient-needle.solana-devnet.quiknode.pro/71caf4b466e52b402cb9891702899d7631646396/';
 const SOLANA_CONNECTION = new Connection(HELIUS_MAINNET_RPC);
 const WALLET = getKeypairFromEnvironment();
