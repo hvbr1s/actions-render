@@ -69,8 +69,8 @@ function getKeypairFromEnvironment(): Keypair {
 }
 
 // Initiate sender wallet and connection to Solana
-const HELIUS_KEY = process.env.HELIUS_API_KEY
-//const HELIUS_MAINNET_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`;
+// const HELIUS_KEY = process.env.HELIUS_API_KEY
+// //const HELIUS_MAINNET_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`;
 const QUICKNODE_RPC = 'https://fragrant-ancient-needle.solana-devnet.quiknode.pro/71caf4b466e52b402cb9891702899d7631646396/';
 const SOLANA_CONNECTION = new Connection(QUICKNODE_RPC);
 const WALLET = getKeypairFromEnvironment();
@@ -423,8 +423,8 @@ async function getFeeInLamports(connection: Connection): Promise<number> {
   const data = await response.json();
   const solPrice = data.solana.usd;
 
-  // 2. Calculate SOL equivalent of 7 USD
-  const solAmount = 7 / solPrice;
+  // 2. Calculate SOL equivalent of 5 USD
+  const solAmount = 5 / solPrice;
 
   // 3. Convert SOL to lamports
   const lamports = solAmount * LAMPORTS_PER_SOL;
@@ -514,7 +514,8 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
       // Get fee price
       const mintingFee =  await getFeeInLamports(connection);
-      console.log(`Fee for this transaction -> ${mintingFee} lamports or `)
+      const mintingFeeSOL = mintingFee / LAMPORTS_PER_SOL;
+      console.log(`Fee for this transaction -> ${mintingFee} lamports or ${mintingFeeSOL} SOL.`)
 
       // Adding payment
       transaction.add(
@@ -536,7 +537,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
       // Set computational resources for transaction
       transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }))
-      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1_000_000 }))
+      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 }))
 
       // Set transaction's blockchash and fee payer
       transaction.recentBlockhash = blockhash;
