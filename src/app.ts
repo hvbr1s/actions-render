@@ -536,7 +536,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
       // Set computational resources for transaction
       transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }))
-      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1_000_000 }))
+      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 }))
 
       // Set transaction's blockchash and fee payer
       transaction.recentBlockhash = blockhash;
