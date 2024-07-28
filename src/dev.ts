@@ -199,8 +199,7 @@ async function defineConfig(llmPrompt: string, randomNumber: number, memo: strin
         {trait_type: 'Haiku', value:llmResponse.haiku ||''},
         {trait_type: 'Note', value: memo ||''}
     ],
-    sellerFeeBasisPoints: 500, // 500 bp = 5%
-    symbol: 'AIART',
+    sellerFeeBasisPoints: 0,
     creators: [
         {address: WALLET.publicKey, share: 100}
     ]
@@ -264,7 +263,6 @@ async function mintProgrammableNft(
     metadataUri: string,
     name: string,
     sellerFee: number,
-    symbol: string,
     creators: { address: PublicKey, share: number }[]
   ) {
     try {
@@ -275,9 +273,8 @@ async function mintProgrammableNft(
           uri: metadataUri,
           name,
           sellerFeeBasisPoints: sellerFee,
-          symbol,
           creators,
-          isMutable: true,
+          isMutable: false,
           isCollection: false,
           tokenStandard: TokenStandard.ProgrammableNonFungible,
           ruleSet: null
@@ -573,7 +570,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
         });
 
         console.log(`Minting your NFT🔨`);
-        const mintAddress = await mintProgrammableNft(metadataUri, CONFIG.imgName, CONFIG.sellerFeeBasisPoints, CONFIG.symbol, CONFIG.creators);
+        const mintAddress = await mintProgrammableNft(metadataUri, CONFIG.imgName, CONFIG.sellerFeeBasisPoints, CONFIG.creators);
         if (!mintAddress) {
           throw new Error("Failed to mint the NFT. Mint address is undefined.");
         }
@@ -603,4 +600,5 @@ app.listen(port, () => {
   console.log(`Listening at http://localhost:${port}/`);
   console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/devnet`)
 });
+
 export default app;
