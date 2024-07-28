@@ -463,8 +463,7 @@ app.get('/get_action', async (req, res) => {
 });
 
 app.options('/post_action', (req: Request, res: Response) => {
-  // res.header(ACTIONS_CORS_HEADERS).sendStatus(200);
-  res.header(ACTIONS_CORS_HEADERS).status(200);
+  res.header(ACTIONS_CORS_HEADERS).status(200).end();
 });
 
 app.use(express.json());
