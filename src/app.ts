@@ -363,7 +363,7 @@ async function transferNFT(
 }
 
 async function findTransactionWithMemo(connection: Connection, userAccount: PublicKey, memo: string): Promise<TransactionSignature | null> {
-  const maxChecks = 10;
+  const maxChecks = 4;
   let checkCount = 0;
 
   console.log(`Searching for memo: "${memo}"`);
@@ -392,8 +392,8 @@ async function findTransactionWithMemo(connection: Connection, userAccount: Publ
     checkCount++;
 
     if (checkCount < maxChecks) {
-      console.log("Waiting 5 seconds before next check...");
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      console.log("Waiting 10 seconds before next check...");
+      await new Promise(resolve => setTimeout(resolve, 10000));
     }
   }
 
@@ -409,7 +409,7 @@ async function getFeeInLamports(connection: Connection): Promise<number> {
   const solPrice = data.solana.usd;
 
   // 2. Calculate SOL equivalent of n USD
-  const solAmount = 8 / solPrice;
+  const solAmount = 0.2 / solPrice;
 
   // 3. Convert SOL to lamports
   const lamports = solAmount * LAMPORTS_PER_SOL;
