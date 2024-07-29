@@ -409,7 +409,7 @@ async function getFeeInLamports(connection: Connection): Promise<number> {
   const solPrice = data.solana.usd;
 
   // 2. Calculate SOL equivalent of n USD
-  const solAmount = 0.2 / solPrice;
+  const solAmount = 10 / solPrice;
 
   // 3. Convert SOL to lamports
   const lamports = solAmount * LAMPORTS_PER_SOL;
@@ -440,7 +440,7 @@ app.get('/get_action', async (req, res) => {
                 },
                 {
                   name: "memo",
-                  label: "Add a note",
+                  label: "Add a personal note",
                   required: true,
                 }
               ]
