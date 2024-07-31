@@ -448,7 +448,7 @@ app.get('/get_action', async (req, res) => {
           ]
         },
         error:{
-          message: "⚠️ A single mint costs $10 USD, payable in SOL.\nThis blink is still in beta, use at your own risks!"
+          message: "⚠️ A single mint costs $10 USD + tx fees, payable in SOL.\nThis blink is still in beta, use at your own risks!"
         },
       };
   
