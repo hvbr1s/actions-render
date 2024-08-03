@@ -73,13 +73,6 @@ const QUICKNODE_KEY = process.env.QUICKNODE_RPC_KEY
 const QUICKNODE_RPC = `https://fragrant-ancient-needle.solana-devnet.quiknode.pro/${QUICKNODE_KEY}/`;
 const SOLANA_CONNECTION = new Connection(QUICKNODE_RPC);
 const WALLET = getKeypairFromEnvironment();
-const METAPLEX = Metaplex.make(SOLANA_CONNECTION)
-    .use(keypairIdentity(WALLET))
-    .use(bundlrStorage({
-        address: 'https://devnet.bundlr.network', // Devnet
-        providerUrl: QUICKNODE_RPC,
-        timeout: 60000,
-    }));
 
 ///// AI LOGIC
 const oai_client = new OpenAI({apiKey: process.env['OPENAI_API_KEY']});
@@ -209,10 +202,21 @@ async function defineConfig(llmPrompt: string, randomNumber: number, memo: strin
 }
 
 ///// NFT LOGIC
+async function createMetaplexInstance(connection:Connection, wallet: Keypair){
+  return Metaplex.make(connection)
+  .use(keypairIdentity(wallet))
+  .use(bundlrStorage({
+      address: 'https://devnet.bundlr.network', // Devnet
+      providerUrl: QUICKNODE_RPC,
+      timeout: 60000,
+  }));
+}
+
 async function uploadImage(filePath: string,fileName: string): Promise<string>  {
   const imgBuffer = fs.readFileSync(filePath + fileName);
   const imgMetaplexFile = toMetaplexFile(imgBuffer,fileName);
-  const imgUri = await METAPLEX.storage().upload(imgMetaplexFile);
+  const metaplex = await createMetaplexInstance(SOLANA_CONNECTION, WALLET);
+  const imgUri = await metaplex.storage().upload(imgMetaplexFile);
   return imgUri;
 }
 
@@ -240,7 +244,8 @@ async function imagine(userPrompt: string, randomNumber: number) {
 }
 
 async function uploadMetadata(imgUri: string, imgType: string, nftName: string, description: string, attributes: {trait_type: string, value: string}[]) {
-  const { uri } = await METAPLEX
+  const metaplex = await createMetaplexInstance(SOLANA_CONNECTION, WALLET)
+  const { uri } = await metaplex
   .nfts()
   .uploadMetadata({
       name: nftName,
@@ -266,7 +271,8 @@ async function mintProgrammableNft(
     creators: { address: PublicKey, share: number }[]
   ) {
     try {
-      const transactionBuilder = await METAPLEX
+      const metaplex = await createMetaplexInstance(SOLANA_CONNECTION, WALLET)
+      const transactionBuilder = await metaplex
         .nfts()
         .builders()
         .create({
@@ -280,7 +286,7 @@ async function mintProgrammableNft(
           ruleSet: null
         });
   
-      const { signature } = await METAPLEX.rpc().sendAndConfirmTransaction(transactionBuilder);
+      const { signature } = await metaplex.rpc().sendAndConfirmTransaction(transactionBuilder);
       const { mintAddress } = transactionBuilder.getContext();
   
       console.log(`Mint successful! 🎉`);
@@ -327,14 +333,15 @@ async function transferNFT(
       }
 
       // Build and send the transfer transaction
-      const transferTransactionBuilder = await METAPLEX.nfts().builders().transfer({
+      const metaplex = await createMetaplexInstance(SOLANA_CONNECTION, WALLET)
+      const transferTransactionBuilder = await metaplex.nfts().builders().transfer({
         nftOrSft: {address: mint, tokenStandard: TokenStandard.ProgrammableNonFungible},
         authority: WALLET,
         fromOwner: WALLET.publicKey,
         toOwner: destination,
       });
 
-      const { signature: sig2, confirmResponse: res2 } = await METAPLEX.rpc().sendAndConfirmTransaction(
+      const { signature: sig2, confirmResponse: res2 } = await metaplex.rpc().sendAndConfirmTransaction(
         transferTransactionBuilder, 
         { commitment: 'finalized' }
       );
