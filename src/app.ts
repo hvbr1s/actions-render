@@ -45,8 +45,6 @@ import {
 } from "@metaplex-foundation/js";
 import { TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
 
-const TREASURY_WALLET = new PublicKey('AXP4CzLGxxHtXSJYh5Vzw9S8msoNR5xzpsgfMdFd11W1');
-
 // Load environment variable
 dotenv.config();
 
@@ -68,18 +66,11 @@ function getKeypairFromEnvironment(): Keypair {
   return Keypair.fromSecretKey(privateKeyUint8Array);
 }
 
-// Initiate sender wallet and connection to Solana
+// Initiate sender wallet, treasury wallet and connection to Solana
+const TREASURY_WALLET = new PublicKey('AXP4CzLGxxHtXSJYh5Vzw9S8msoNR5xzpsgfMdFd11W1');
 const QUICKNODE_KEY = process.env.QUICKNODE_RPC_KEY
 const QUICKNODE_RPC = `https://winter-solemn-sun.solana-mainnet.quiknode.pro/${QUICKNODE_KEY}/`;
-const SOLANA_CONNECTION = new Connection(QUICKNODE_RPC);
 const WALLET = getKeypairFromEnvironment();
-const METAPLEX = Metaplex.make(SOLANA_CONNECTION)
-    .use(keypairIdentity(WALLET))
-    .use(bundlrStorage({
-        address: 'https://node1.bundlr.network', // Mainnet
-        providerUrl: QUICKNODE_RPC,
-        timeout: 60000,
-    }));
 
 ///// AI LOGIC
 const oai_client = new OpenAI({apiKey: process.env['OPENAI_API_KEY']});
@@ -98,6 +89,13 @@ const UserSchema = z.object({
   prompt: z.string(), 
   safety: z.string().describe("Is the prompt 'safe' or 'unsafe'? An unsafe prompt contains reference to sexual violence, child abuse or scams. A safe prompt does not")
 })
+
+// Solana connection handler
+async function createNewConnection(rpcUrl: string){
+  const connection = await new Connection(rpcUrl)
+  console.log(`Connection to Solana established`)
+  return connection;
+}
 
 // Initialize safety check
 async function safePrompting(userPrompt: string){
@@ -209,10 +207,22 @@ async function defineConfig(llmPrompt: string, randomNumber: number, memo: strin
 }
 
 ///// NFT LOGIC
-async function uploadImage(filePath: string,fileName: string): Promise<string>  {
+async function createMetaplexInstance(connection:Connection, wallet: Keypair){
+  const newMetaplexInstance =  Metaplex.make(connection)
+  .use(keypairIdentity(wallet))
+  .use(bundlrStorage({
+      address: 'https://node1.bundlr.network', // Mainnet
+      providerUrl: QUICKNODE_RPC,
+      timeout: 60000,
+  }));
+  console.log(`New Metaplex instance created!`)
+  return newMetaplexInstance
+}
+
+async function uploadImage(filePath: string,fileName: string, connection:Connection, metaplex:Metaplex): Promise<string>  {
   const imgBuffer = fs.readFileSync(filePath + fileName);
   const imgMetaplexFile = toMetaplexFile(imgBuffer,fileName);
-  const imgUri = await METAPLEX.storage().upload(imgMetaplexFile);
+  const imgUri = await metaplex.storage().upload(imgMetaplexFile);
   return imgUri;
 }
 
@@ -222,6 +232,7 @@ async function imagine(userPrompt: string, randomNumber: number) {
     prompt: userPrompt + ' . Begin!',
     n: 1,
     size: "1024x1024",
+    quality:'hd' // OR 'standard'
   });
   const imageUrl = response.data[0].url;
 
@@ -239,8 +250,9 @@ async function imagine(userPrompt: string, randomNumber: number) {
   return imagePath
 }
 
-async function uploadMetadata(imgUri: string, imgType: string, nftName: string, description: string, attributes: {trait_type: string, value: string}[]) {
-  const { uri } = await METAPLEX
+async function uploadMetadata(imgUri: string, imgType: string, nftName: string, description: string, attributes: {trait_type: string, value: string}[], connection: Connection, metaplex: Metaplex) {
+
+  const { uri } = await metaplex
   .nfts()
   .uploadMetadata({
       name: nftName,
@@ -263,10 +275,11 @@ async function mintProgrammableNft(
     metadataUri: string,
     name: string,
     sellerFee: number,
-    creators: { address: PublicKey, share: number }[]
+    creators: { address: PublicKey, share: number }[],
+    metaplex: Metaplex
   ) {
     try {
-      const transactionBuilder = await METAPLEX
+      const transactionBuilder = await metaplex
         .nfts()
         .builders()
         .create({
@@ -280,7 +293,7 @@ async function mintProgrammableNft(
           ruleSet: null
         });
   
-      const { signature } = await METAPLEX.rpc().sendAndConfirmTransaction(transactionBuilder);
+      const { signature } = await metaplex.rpc().sendAndConfirmTransaction(transactionBuilder);
       const { mintAddress } = transactionBuilder.getContext();
   
       console.log(`Mint successful! 🎉`);
@@ -299,8 +312,10 @@ async function transferNFT(
   senderKeypair: Keypair, 
   recipientPublicKey: string,
   mintAddress: string,
+  connection: Connection,
+  metaplex: Metaplex,
   maxRetries = 10,
-  retryDelay = 2000 // 2 seconds
+  retryDelay = 2000, // 2 seconds
 ) {
   const senderAddress = senderKeypair.publicKey.toString();
   const destination = new PublicKey(recipientPublicKey);
@@ -311,7 +326,7 @@ async function transferNFT(
       console.log(`Attempt ${attempt} to transfer NFT`);
 
       // Check if the mint account exists
-      const accountInfo = await SOLANA_CONNECTION.getAccountInfo(mint);
+      const accountInfo = await connection.getAccountInfo(mint);
       if (!accountInfo) {
         console.log('Mint account does not exist. Retrying...');
         await sleep(retryDelay);
@@ -321,20 +336,20 @@ async function transferNFT(
       console.log(`Current Owner of the NFT: ${accountInfo.owner.toString()}`);
 
       // Check if the sender owns the NFT
-      const tokenAccounts = await SOLANA_CONNECTION.getTokenAccountsByOwner(senderKeypair.publicKey, { mint });
+      const tokenAccounts = await connection.getTokenAccountsByOwner(senderKeypair.publicKey, { mint });
       if (tokenAccounts.value.length === 0) {
         throw new Error('Sender does not own the NFT');
       }
 
       // Build and send the transfer transaction
-      const transferTransactionBuilder = await METAPLEX.nfts().builders().transfer({
+      const transferTransactionBuilder = await metaplex.nfts().builders().transfer({
         nftOrSft: {address: mint, tokenStandard: TokenStandard.ProgrammableNonFungible},
         authority: WALLET,
         fromOwner: WALLET.publicKey,
         toOwner: destination,
       });
 
-      const { signature: sig2, confirmResponse: res2 } = await METAPLEX.rpc().sendAndConfirmTransaction(
+      const { signature: sig2, confirmResponse: res2 } = await metaplex.rpc().sendAndConfirmTransaction(
         transferTransactionBuilder, 
         { commitment: 'finalized' }
       );
@@ -363,7 +378,7 @@ async function transferNFT(
 }
 
 async function findTransactionWithMemo(connection: Connection, userAccount: PublicKey, memo: string): Promise<TransactionSignature | null> {
-  const maxChecks = 4;
+  const maxChecks = 10;
   let checkCount = 0;
 
   console.log(`Searching for memo: "${memo}"`);
@@ -375,7 +390,6 @@ async function findTransactionWithMemo(connection: Connection, userAccount: Publ
       { limit: 5 },
       'confirmed'
     );
-    console.log("Fetched signatures:", signatures);
 
     for (const sigInfo of signatures) {
       console.log(`Checking signature: ${sigInfo.signature}`);
@@ -392,8 +406,8 @@ async function findTransactionWithMemo(connection: Connection, userAccount: Publ
     checkCount++;
 
     if (checkCount < maxChecks) {
-      console.log("Waiting 10 seconds before next check...");
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      console.log("Waiting 5 seconds before next check...");
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
 
@@ -408,7 +422,7 @@ async function getFeeInLamports(connection: Connection): Promise<number> {
   const data = await response.json();
   const solPrice = data.solana.usd;
 
-  // 2. Calculate SOL equivalent of n USD
+  // 2. Calculate SOL equivalent of 5 USD
   const solAmount = 10 / solPrice;
 
   // 3. Convert SOL to lamports
@@ -418,7 +432,7 @@ async function getFeeInLamports(connection: Connection): Promise<number> {
   return Math.round(lamports);
 }
 
-///////// API ROUTES
+///////// API ROUTES ////////
 app.get('/get_action', async (req, res) => {
     try {
       const payload: ActionGetResponse = {
@@ -448,7 +462,7 @@ app.get('/get_action', async (req, res) => {
           ]
         },
         error:{
-          message: "⚠️ A single mint costs $10 USD + tx fees, payable in SOL.\nThis blink is still in beta, use at your own risks!"
+          message: "⚠️ A single mint costs $10 USD, payable in SOL.\nThis blink is still in beta, use at your own risks!"
         },
       };
   
@@ -466,10 +480,10 @@ app.options('/post_action', (req: Request, res: Response) => {
 app.use(express.json());
 app.post('/post_action', async (req: Request, res: Response) => {
 
-  const randomNumber = Math.floor(Math.random() * 10000);
+  const randomNumber = Math.floor(Math.random() * 100000);
 
   try {
-    
+
     const prompt = (req.query.user_prompt as string || '').trim();
     console.log('User prompt:', prompt);
     const pre_memo = (req.query.memo as string || '').trim();
@@ -487,10 +501,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Invalid account' });
       }
 
-      const connection = new Connection(
-        process.env.SOLANA_RPC! || clusterApiUrl("mainnet-beta"),
-      );
-
+      const connection = await createNewConnection(QUICKNODE_RPC)
       const transaction = new Transaction();
 
       // Get the latest blockhash
@@ -541,7 +552,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
       if (transactionSignature) {
         console.log(`Found transaction with memo: ${transactionSignature}`);
         
-        // Trigger NFT creation process
+        // NFT logic -> AI
         const llmSays = await generatePrompt(prompt);
         console.log(`LLM prompt 🤖-> ${llmSays}`);
 
@@ -552,11 +563,13 @@ app.post('/post_action', async (req: Request, res: Response) => {
         const imageLocation = await imagine(llmSays, randomNumber);
         console.log(`Image successfully created 🎨`);
 
+        // MFT Logic -> Metaplex
+        const metaplex =  await createMetaplexInstance(connection, WALLET)
         console.log(`Uploading your Image🔼`);
-        const imageUri = await uploadImage(imageLocation, "");
+        const imageUri = await uploadImage(imageLocation, "", connection, metaplex);
 
         console.log(`Uploading the Metadata⏫`);
-        const metadataUri = await uploadMetadata(imageUri, CONFIG.imgType, CONFIG.imgName, CONFIG.description, CONFIG.attributes);
+        const metadataUri = await uploadMetadata(imageUri, CONFIG.imgType, CONFIG.imgName, CONFIG.description, CONFIG.attributes, connection, metaplex);
         console.log(`Metadata URI -> ${metadataUri}`);
 
         // Delete local image file
@@ -569,13 +582,13 @@ app.post('/post_action', async (req: Request, res: Response) => {
         });
 
         console.log(`Minting your NFT🔨`);
-        const mintAddress = await mintProgrammableNft(metadataUri, CONFIG.imgName, CONFIG.sellerFeeBasisPoints, CONFIG.creators);
+        const mintAddress = await mintProgrammableNft(metadataUri, CONFIG.imgName, CONFIG.sellerFeeBasisPoints, CONFIG.creators, metaplex);
         if (!mintAddress) {
           throw new Error("Failed to mint the NFT. Mint address is undefined.");
         }
         
         console.log(`Transferring your NFT 📬`);
-        const mintSend = await transferNFT(WALLET, user_account.toString(), mintAddress.toString());
+        const mintSend = await transferNFT(WALLET, user_account.toString(), mintAddress.toString(), connection, metaplex);
         console.log(mintSend);
       } else {
         console.log('Transaction with memo not found within the timeout period');
@@ -599,4 +612,5 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${port}`);
   console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/devnet`)
 });
+
 export default app;
