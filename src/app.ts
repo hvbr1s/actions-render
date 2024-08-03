@@ -610,6 +610,6 @@ const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
 // Start prod server
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${port}`);
-  console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/devnet`)
+  console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/`)
 });
 export default app;
