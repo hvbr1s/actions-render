@@ -232,7 +232,7 @@ async function imagine(userPrompt: string, randomNumber: number) {
     model: "dall-e-3",
     prompt: userPrompt + ' . Begin!',
     n: 1,
-    size: "512x512",
+    size: "1024x1024",
   });
   const imageUrl = response.data[0].url;
 
@@ -313,9 +313,9 @@ async function transferNFT(
   senderKeypair: Keypair, 
   recipientPublicKey: string,
   mintAddress: string,
+  connection: Connection,
   maxRetries = 10,
   retryDelay = 2000, // 2 seconds
-  connection: Connection
 ) {
   const senderAddress = senderKeypair.publicKey.toString();
   const destination = new PublicKey(recipientPublicKey);
