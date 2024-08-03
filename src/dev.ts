@@ -391,7 +391,6 @@ async function findTransactionWithMemo(connection: Connection, userAccount: Publ
       { limit: 5 },
       'confirmed'
     );
-    console.log("Fetched signatures:", signatures);
 
     for (const sigInfo of signatures) {
       console.log(`Checking signature: ${sigInfo.signature}`);
