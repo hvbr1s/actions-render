@@ -232,7 +232,7 @@ async function imagine(userPrompt: string, randomNumber: number) {
     prompt: userPrompt + ' . Begin!',
     n: 1,
     size: "1024x1024",
-    quality:'hd' // OR 'standard'
+    quality:'standard' // OR 'hd'
   });
   const imageUrl = response.data[0].url;
 
@@ -612,5 +612,4 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${port}`);
   console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/devnet`)
 });
-
 export default app;
