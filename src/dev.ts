@@ -215,14 +215,13 @@ async function createMetaplexInstance(connection:Connection, wallet: Keypair){
       providerUrl: QUICKNODE_RPC,
       timeout: 60000,
   }));
-  console.log('New Metaplex instance created!')
+  console.log(`New Metaplex instance created!:${newMetaplexInstance}`)
   return newMetaplexInstance
 }
 
-async function uploadImage(filePath: string,fileName: string, connection:Connection): Promise<string>  {
+async function uploadImage(filePath: string,fileName: string, connection:Connection, metaplex:Metaplex): Promise<string>  {
   const imgBuffer = fs.readFileSync(filePath + fileName);
   const imgMetaplexFile = toMetaplexFile(imgBuffer,fileName);
-  const metaplex = await createMetaplexInstance(connection, WALLET);
   const imgUri = await metaplex.storage().upload(imgMetaplexFile);
   return imgUri;
 }
@@ -233,6 +232,7 @@ async function imagine(userPrompt: string, randomNumber: number) {
     prompt: userPrompt + ' . Begin!',
     n: 1,
     size: "1024x1024",
+    quality:'hd' // OR 'standard'
   });
   const imageUrl = response.data[0].url;
 
@@ -250,8 +250,8 @@ async function imagine(userPrompt: string, randomNumber: number) {
   return imagePath
 }
 
-async function uploadMetadata(imgUri: string, imgType: string, nftName: string, description: string, attributes: {trait_type: string, value: string}[], connection: Connection) {
-  const metaplex = await createMetaplexInstance(connection, WALLET)
+async function uploadMetadata(imgUri: string, imgType: string, nftName: string, description: string, attributes: {trait_type: string, value: string}[], connection: Connection, metaplex: Metaplex) {
+
   const { uri } = await metaplex
   .nfts()
   .uploadMetadata({
@@ -276,10 +276,10 @@ async function mintProgrammableNft(
     name: string,
     sellerFee: number,
     creators: { address: PublicKey, share: number }[],
-    connection: Connection
+    connection: Connection,
+    metaplex: Metaplex
   ) {
     try {
-      const metaplex = await createMetaplexInstance(connection, WALLET)
       const transactionBuilder = await metaplex
         .nfts()
         .builders()
@@ -314,6 +314,7 @@ async function transferNFT(
   recipientPublicKey: string,
   mintAddress: string,
   connection: Connection,
+  metaplex: Metaplex,
   maxRetries = 10,
   retryDelay = 2000, // 2 seconds
 ) {
@@ -342,7 +343,6 @@ async function transferNFT(
       }
 
       // Build and send the transfer transaction
-      const metaplex = await createMetaplexInstance(connection, WALLET)
       const transferTransactionBuilder = await metaplex.nfts().builders().transfer({
         nftOrSft: {address: mint, tokenStandard: TokenStandard.ProgrammableNonFungible},
         authority: WALLET,
@@ -565,11 +565,12 @@ app.post('/post_action', async (req: Request, res: Response) => {
         console.log(`Image successfully created 🎨`);
 
         // MFT Logic -> Metaplex
+        const metaplex =  await createMetaplexInstance(connection, WALLET)
         console.log(`Uploading your Image🔼`);
-        const imageUri = await uploadImage(imageLocation, "", connection);
+        const imageUri = await uploadImage(imageLocation, "", connection, metaplex);
 
         console.log(`Uploading the Metadata⏫`);
-        const metadataUri = await uploadMetadata(imageUri, CONFIG.imgType, CONFIG.imgName, CONFIG.description, CONFIG.attributes, connection);
+        const metadataUri = await uploadMetadata(imageUri, CONFIG.imgType, CONFIG.imgName, CONFIG.description, CONFIG.attributes, connection, metaplex);
         console.log(`Metadata URI -> ${metadataUri}`);
 
         // Delete local image file
@@ -582,13 +583,13 @@ app.post('/post_action', async (req: Request, res: Response) => {
         });
 
         console.log(`Minting your NFT🔨`);
-        const mintAddress = await mintProgrammableNft(metadataUri, CONFIG.imgName, CONFIG.sellerFeeBasisPoints, CONFIG.creators, connection);
+        const mintAddress = await mintProgrammableNft(metadataUri, CONFIG.imgName, CONFIG.sellerFeeBasisPoints, CONFIG.creators, connection, metaplex);
         if (!mintAddress) {
           throw new Error("Failed to mint the NFT. Mint address is undefined.");
         }
         
         console.log(`Transferring your NFT 📬`);
-        const mintSend = await transferNFT(WALLET, user_account.toString(), mintAddress.toString(), connection);
+        const mintSend = await transferNFT(WALLET, user_account.toString(), mintAddress.toString(), connection, metaplex);
         console.log(mintSend);
       } else {
         console.log('Transaction with memo not found within the timeout period');
