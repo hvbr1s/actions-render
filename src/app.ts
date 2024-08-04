@@ -219,7 +219,7 @@ async function createMetaplexInstance(connection:Connection, wallet: Keypair){
   return newMetaplexInstance
 }
 
-async function uploadImage(filePath: string,fileName: string, connection:Connection, metaplex:Metaplex): Promise<string>  {
+async function uploadImage(filePath: string,fileName: string, metaplex:Metaplex): Promise<string>  {
   const imgBuffer = fs.readFileSync(filePath + fileName);
   const imgMetaplexFile = toMetaplexFile(imgBuffer,fileName);
   const imgUri = await metaplex.storage().upload(imgMetaplexFile);
@@ -250,7 +250,7 @@ async function imagine(userPrompt: string, randomNumber: number) {
   return imagePath
 }
 
-async function uploadMetadata(imgUri: string, imgType: string, nftName: string, description: string, attributes: {trait_type: string, value: string}[], connection: Connection, metaplex: Metaplex) {
+async function uploadMetadata(imgUri: string, imgType: string, nftName: string, description: string, attributes: {trait_type: string, value: string}[], metaplex: Metaplex) {
 
   const { uri } = await metaplex
   .nfts()
@@ -416,14 +416,14 @@ async function findTransactionWithMemo(connection: Connection, userAccount: Publ
 }
 
 // Fee setting function
-async function getFeeInLamports(connection: Connection): Promise<number> {
+async function getFeeInLamports(): Promise<number> {
   // 1. Get the current SOL/USD price
   const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
   const data = await response.json();
   const solPrice = data.solana.usd;
 
   // 2. Calculate SOL equivalent of 5 USD
-  const solAmount = 10 / solPrice;
+  const solAmount = 5 / solPrice;
 
   // 3. Convert SOL to lamports
   const lamports = solAmount * LAMPORTS_PER_SOL;
@@ -508,7 +508,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
       const { blockhash } = await connection.getLatestBlockhash();
 
       // Get fee price
-      const mintingFee =  await getFeeInLamports(connection);
+      const mintingFee =  await getFeeInLamports();
       const mintingFeeSOL = mintingFee / LAMPORTS_PER_SOL;
       console.log(`Fee for this transaction -> ${mintingFee} lamports or ${mintingFeeSOL} SOL.`)
 
@@ -531,8 +531,8 @@ app.post('/post_action', async (req: Request, res: Response) => {
       );
 
       // Set computational resources for transaction
-      transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
-      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }))
+      transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 20_000 }))
+      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100 }))
 
       // Set transaction's blockchash and fee payer
       transaction.recentBlockhash = blockhash;
@@ -566,10 +566,10 @@ app.post('/post_action', async (req: Request, res: Response) => {
         // MFT Logic -> Metaplex
         const metaplex =  await createMetaplexInstance(connection, WALLET)
         console.log(`Uploading your Image🔼`);
-        const imageUri = await uploadImage(imageLocation, "", connection, metaplex);
+        const imageUri = await uploadImage(imageLocation, "", metaplex);
 
         console.log(`Uploading the Metadata⏫`);
-        const metadataUri = await uploadMetadata(imageUri, CONFIG.imgType, CONFIG.imgName, CONFIG.description, CONFIG.attributes, connection, metaplex);
+        const metadataUri = await uploadMetadata(imageUri, CONFIG.imgType, CONFIG.imgName, CONFIG.description, CONFIG.attributes, metaplex);
         console.log(`Metadata URI -> ${metadataUri}`);
 
         // Delete local image file
@@ -612,4 +612,5 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${port}`);
   console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/`)
 });
+
 export default app;
