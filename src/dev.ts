@@ -1,8 +1,8 @@
 // Node.js built-in modules
 import * as fs from 'fs';
+import { promises as promise } from 'fs';
 import * as path from 'path';
 import fetch from 'node-fetch';
-import { sleep } from "./utils/sleep";
 
 // Third-party modules
 import axios from 'axios';
@@ -33,51 +33,58 @@ import {
   Transaction, 
   TransactionInstruction, 
   TransactionSignature,
-  clusterApiUrl 
 } from '@solana/web3.js';
-
 // Metaplex-related imports
-import { 
-  Metaplex, 
-  bundlrStorage, 
-  keypairIdentity, 
-  toMetaplexFile 
-} from "@metaplex-foundation/js";
-import { TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
+import { publicKey } from '@metaplex-foundation/umi';
+import { mplCore, transferV1, create, fetchAsset } from '@metaplex-foundation/mpl-core';
+import { irysUploader } from '@metaplex-foundation/umi-uploader-irys';
+import { keypairIdentity, generateSigner, GenericFile } from '@metaplex-foundation/umi';
 
 // Load environment variable
 dotenv.config();
 
-// Create a new express application instance
-const app: express.Application = express();
-app.use(cors());
+//// UMI INIT /////
+// const QUICKNODE_RPC = `https://winter-solemn-sun.solana-mainnet.quiknode.pro/${QUICKNODE_MAINNET_KEY}/`; // mainnet
+const QUICKNODE_RPC = `https://fragrant-ancient-needle.solana-devnet.quiknode.pro/${process.env.QUICKNODE_DEVNET_KEY}/`; // devnet 
+const newUMI = createUmi(QUICKNODE_RPC)
 
-// Function to convert private key string to Uint8Array
-function getKeypairFromEnvironment(): Keypair {
+// Load wallet
+function getKeypairFromEnvironment(): Uint8Array {
   const privateKeyString = process.env.MINTER_PRIVATE_KEY;
   if (!privateKeyString) {
     throw new Error('Minter key is not set in environment variables');
   }
   // Convert the private key string to an array of numbers
   const privateKeyArray = privateKeyString.split(',').map(num => parseInt(num, 10));
-  // Create a Uint8Array from the array of numbers
-  const privateKeyUint8Array = new Uint8Array(privateKeyArray);
-  // Create and return the Keypair
-  return Keypair.fromSecretKey(privateKeyUint8Array);
+  // Return a Uint8Array from the array of numbers
+  return new Uint8Array(privateKeyArray);
 }
+const secretKey = getKeypairFromEnvironment()
+const mintKeypair = Keypair.fromSecretKey(secretKey);
 
-// Initiate sender wallet, treasury wallet and connection to Solana
-const TREASURY_WALLET = new PublicKey('AXP4CzLGxxHtXSJYh5Vzw9S8msoNR5xzpsgfMdFd11W1');
-const QUICKNODE_KEY = process.env.QUICKNODE_RPC_KEY
-const QUICKNODE_RPC = `https://fragrant-ancient-needle.solana-devnet.quiknode.pro/${QUICKNODE_KEY}/`;
-const WALLET = getKeypairFromEnvironment();
+// Initialize UMI instance with wallet
+const keypair = newUMI.eddsa.createKeypairFromSecretKey(new Uint8Array(secretKey))
+const umi = newUMI
+  .use(mplCore())
+  .use(irysUploader())
+  .use(keypairIdentity(keypair));
+
+///////////////
+
+// Solana connection handler
+async function createNewConnection(rpcUrl: string){
+  console.log(`Connecting to Solana...🔌`)
+  const connection = await new Connection(rpcUrl)
+  console.log(`Connection to Solana established🔌✅`)
+  return connection;
+}
 
 ///// AI LOGIC
 const oai_client = new OpenAI({apiKey: process.env['OPENAI_API_KEY']});
-const groq_client = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const gpt_llm = "gpt-4o"
+const groq_client = new Groq({ apiKey: process.env['GROQ_API_KEY'] });
+const gpt_llm = "gpt-4o-2024-08-06"
 const llama_llm = "llama-3.1-70b-versatile"
-
 
 // Prepare Instructor
 const instructor_client = Instructor({
@@ -89,13 +96,6 @@ const UserSchema = z.object({
   prompt: z.string(), 
   safety: z.string().describe("Is the prompt 'safe' or 'unsafe'? An unsafe prompt contains reference to sexual violence, child abuse or scams. A safe prompt does not")
 })
-
-// Solana connection handler
-async function createNewConnection(rpcUrl: string){
-  const connection = await new Connection(rpcUrl)
-  console.log(`Connection to Solana established`)
-  return connection;
-}
 
 // Initialize safety check
 async function safePrompting(userPrompt: string){
@@ -116,7 +116,7 @@ async function safePrompting(userPrompt: string){
   
 // Print the completion returned by the LLM.
 const safetyCheckResponse = llmSafetyCheck.safety.toLowerCase();
-console.log(`The prompt is ${safetyCheckResponse}`)
+console.log(`The prompt is ${safetyCheckResponse} 👮`)
 return safetyCheckResponse;
 }
 
@@ -150,6 +150,22 @@ async function generatePrompt(userPrompt: string) {
   // Print the completion returned by the LLM.
   const parsedresponse = JSON.stringify(llmResponse.choices[0]?.message?.content || "");
   return parsedresponse;
+}
+
+interface NFTConfig {
+  uploadPath: string;
+  imgFileName: string;
+  imgType: string;
+  imgName: string;
+  description: string;
+  attributes: Array<{
+    trait_type: string;
+    value: string;
+  }>;
+}
+
+interface UriConfig extends NFTConfig {
+  imageURI: string;
 }
 
 async function defineConfig(llmPrompt: string, randomNumber: number, memo: string) {
@@ -187,7 +203,7 @@ async function defineConfig(llmPrompt: string, randomNumber: number, memo: strin
   // Extract the completion returned by the LLM and parse it.
   const llmResponse = JSON.parse(nftAttributes.choices[0]?.message?.content || "{}");
 
-  const CONFIG = {
+  const CONFIG: NFTConfig = {
     uploadPath: './image/',
     imgFileName: `image${randomNumber}.png`,
     imgType: 'image/png',
@@ -196,186 +212,117 @@ async function defineConfig(llmPrompt: string, randomNumber: number, memo: strin
     attributes: [
         {trait_type: 'Haiku', value:llmResponse.haiku ||''},
         {trait_type: 'Note', value: memo ||''}
-    ],
-    sellerFeeBasisPoints: 0,
-    creators: [
-        {address: WALLET.publicKey, share: 100}
     ]
   };
 
   return CONFIG;
 }
 
-///// NFT LOGIC
-async function createMetaplexInstance(connection:Connection, wallet: Keypair){
-  const newMetaplexInstance =  Metaplex.make(connection)
-  .use(keypairIdentity(wallet))
-  .use(bundlrStorage({
-      address: 'https://devnet.bundlr.network', // Devnet
-      providerUrl: QUICKNODE_RPC,
-      timeout: 60000,
-  }));
-  console.log(`New Metaplex instance created!:${newMetaplexInstance}`)
-  return newMetaplexInstance
-}
+async function createURI(imagePath: string, CONFIG: NFTConfig): Promise<string> {
+try {
+  // Read the image file
+  const imageBuffer = await promise.readFile(imagePath);
 
-async function uploadImage(filePath: string,fileName: string, connection:Connection, metaplex:Metaplex): Promise<string>  {
-  const imgBuffer = fs.readFileSync(filePath + fileName);
-  const imgMetaplexFile = toMetaplexFile(imgBuffer,fileName);
-  const imgUri = await metaplex.storage().upload(imgMetaplexFile);
-  return imgUri;
-}
+  // Create a GenericFile object
+  const imageFile: GenericFile = {
+    buffer: imageBuffer,
+    fileName: CONFIG.imgFileName,
+    displayName: CONFIG.imgName,
+    uniqueName: CONFIG.imgFileName,
+    contentType: CONFIG.imgType,
+    extension: 'png',
+    tags: [],
+  };
 
-async function imagine(userPrompt: string, randomNumber: number) {
-  const response = await oai_client.images.generate({
-    model: "dall-e-3",
-    prompt: userPrompt + ' . Begin!',
-    n: 1,
-    size: "1024x1024",
-    quality:'hd' // OR 'standard'
-  });
-  const imageUrl = response.data[0].url;
-
-  // Fetch the image from the URL
-  const imageResponse = await axios({
-    url: imageUrl,
-    method: 'GET',
-    responseType: 'arraybuffer'
-  });
-
-  const imagePath = path.join('./image', `image_${randomNumber}.png`);
-
-  // Write the image data to a file
-  fs.writeFileSync(imagePath, imageResponse.data);
-  return imagePath
-}
-
-async function uploadMetadata(imgUri: string, imgType: string, nftName: string, description: string, attributes: {trait_type: string, value: string}[], connection: Connection, metaplex: Metaplex) {
-
-  const { uri } = await metaplex
-  .nfts()
-  .uploadMetadata({
-      name: nftName,
-      description: description,
-      image: imgUri,
-      attributes: attributes,
-      properties: {
-          files: [
-              {
-                  type: imgType,
-                  uri: imgUri,
-              },
-          ]
-      }
-  });
-  return uri;  
-}
-
-async function mintProgrammableNft(
-    metadataUri: string,
-    name: string,
-    sellerFee: number,
-    creators: { address: PublicKey, share: number }[],
-    connection: Connection,
-    metaplex: Metaplex
-  ) {
-    try {
-      const transactionBuilder = await metaplex
-        .nfts()
-        .builders()
-        .create({
-          uri: metadataUri,
-          name,
-          sellerFeeBasisPoints: sellerFee,
-          creators,
-          isMutable: false,
-          isCollection: false,
-          tokenStandard: TokenStandard.ProgrammableNonFungible,
-          ruleSet: null
-        });
-  
-      const { signature } = await metaplex.rpc().sendAndConfirmTransaction(transactionBuilder);
-      const { mintAddress } = transactionBuilder.getContext();
-  
-      console.log(`Mint successful! 🎉`);
-      console.log(`Minted NFT: https://explorer.solana.com/address/${mintAddress.toString()}`);
-      console.log(`Mint transaction: https://explorer.solana.com/tx/${signature}`);
-  
-      return mintAddress;
-    } catch (err) {
-      console.error('Minting failed:', err);
-      throw err;
-    }
+  // Upload the image and get its URI
+  const [imageUri] = await umi.uploader.upload([imageFile]);
+  if (!imageUri) {
+    throw new Error("Failed to upload image");
   }
 
-// Transfer function 
-async function transferNFT(
-  senderKeypair: Keypair, 
-  recipientPublicKey: string,
-  mintAddress: string,
-  connection: Connection,
-  metaplex: Metaplex,
-  maxRetries = 10,
-  retryDelay = 2000, // 2 seconds
-) {
-  const senderAddress = senderKeypair.publicKey.toString();
-  const destination = new PublicKey(recipientPublicKey);
-  const mint = new PublicKey(mintAddress);
+  // Add the image URI to the config
+  const configWithUri: UriConfig = {
+    ...CONFIG,
+    imageURI: imageUri,
+  };
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`Attempt ${attempt} to transfer NFT`);
-
-      // Check if the mint account exists
-      const accountInfo = await connection.getAccountInfo(mint);
-      if (!accountInfo) {
-        console.log('Mint account does not exist. Retrying...');
-        await sleep(retryDelay);
-        continue;
-      }
-
-      console.log(`Current Owner of the NFT: ${accountInfo.owner.toString()}`);
-
-      // Check if the sender owns the NFT
-      const tokenAccounts = await connection.getTokenAccountsByOwner(senderKeypair.publicKey, { mint });
-      if (tokenAccounts.value.length === 0) {
-        throw new Error('Sender does not own the NFT');
-      }
-
-      // Build and send the transfer transaction
-      const transferTransactionBuilder = await metaplex.nfts().builders().transfer({
-        nftOrSft: {address: mint, tokenStandard: TokenStandard.ProgrammableNonFungible},
-        authority: WALLET,
-        fromOwner: WALLET.publicKey,
-        toOwner: destination,
-      });
-
-      const { signature: sig2, confirmResponse: res2 } = await metaplex.rpc().sendAndConfirmTransaction(
-        transferTransactionBuilder, 
-        { commitment: 'finalized' }
-      );
-
-      if (res2.value.err) {
-        throw new Error('Failed to confirm transfer transaction');
-      }
-
-      // If we reach here, the transfer was successful
-      return {
-        message: "Transfer successful!🥳",
-        sender: `https://explorer.solana.com/address/${senderAddress}`,
-        receiver: `https://explorer.solana.com/address/${recipientPublicKey}/tokens`,
-        transaction: `https://explorer.solana.com/tx/${sig2}`
-      };
-    } catch (error) {
-      console.error(`Error in attempt ${attempt}:`, error);
-      if (attempt === maxRetries) {
-        throw error; // Rethrow the error if we've exhausted all retries
-      }
-      await sleep(retryDelay);
-    }
+  // Upload the JSON metadata
+  const metadataUri = await umi.uploader.uploadJson(configWithUri);
+  if (!metadataUri) {
+    throw new Error("Failed to upload metadata");
   }
 
-  throw new Error('Failed to transfer NFT after multiple attempts');
+  return metadataUri;
+} catch (error) {
+  console.error("Error in createURI:", error);
+  throw error;
+}
+}
+
+async function imagine(userPrompt: string, CONFIG: NFTConfig, randomNumber: number) {
+
+  try{
+
+    const response = await oai_client.images.generate({
+      model: "dall-e-3",
+      prompt: userPrompt + ' . Begin!',
+      n: 1,
+      size: "1024x1024",
+      quality:'standard' // OR 'hd'
+    });
+    const imageUrl = response.data[0].url;
+
+    // Fetch the image from the URL
+    const imageResponse = await axios({
+      url: imageUrl,
+      method: 'GET',
+      responseType: 'arraybuffer'
+    });
+
+  //   const imagePath = path.join('./image', `image_${randomNumber}.png`);
+
+  //   // Write the image data to a file
+  //   fs.writeFileSync(imagePath, imageResponse.data);
+  //   return imagePath
+
+      // Use the CONFIG.uploadPath and imgFileName for consistency
+      const imagePath = path.join(CONFIG.uploadPath, `${CONFIG.imgFileName}_${randomNumber}.png`);
+
+      // Ensure the directory exists
+      fs.mkdirSync(path.dirname(imagePath), { recursive: true });
+
+      // Write the image data to a file
+      await fs.promises.writeFile(imagePath, imageResponse.data);
+      console.log(imagePath)
+
+      return imagePath;
+  } catch (error) {
+    console.error("Error in createImage:", error);
+    throw error;
+  }
+
+}
+
+async function createAsset(CONFIG: UriConfig): Promise<string> {
+  try {
+    // Generate a new signer for the asset
+    const assetSigner = generateSigner(umi);
+
+    // Create the asset
+    const result = await create(umi, {
+      asset: assetSigner,
+      name: CONFIG.imgName,
+      uri: CONFIG.imageURI,
+    }).sendAndConfirm(umi);
+
+    console.log(result)
+    console.log(`Asset address: ${assetSigner.publicKey}`);
+
+    return assetSigner.publicKey.toString();
+  } catch (error) {
+    console.error("Error in createAsset:", error);
+    throw error;
+  }
 }
 
 async function findTransactionWithMemo(connection: Connection, userAccount: PublicKey, memo: string): Promise<TransactionSignature | null> {
@@ -411,29 +358,42 @@ async function findTransactionWithMemo(connection: Connection, userAccount: Publ
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
-
   console.log("Maximum checks reached, no matching memo found");
   return null;
 }
 
 // Fee setting function
-async function getFeeInLamports(connection: Connection): Promise<number> {
-  // 1. Get the current SOL/USD price
-  const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-  const data = await response.json();
-  const solPrice = data.solana.usd;
+async function getFeeInLamports(): Promise<number> {
+  try {
+    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    const solPrice = data.solana.usd;
 
-  // 2. Calculate SOL equivalent of 5 USD
-  const solAmount = 5 / solPrice;
-
-  // 3. Convert SOL to lamports
-  const lamports = solAmount * LAMPORTS_PER_SOL;
-
-  // Round to the nearest whole number of lamports
-  return Math.round(lamports);
+    if (solPrice && typeof solPrice === 'number' && solPrice > 0) {
+      const solAmount = 2 / solPrice; //target fee $5
+      const lamports = Math.round(solAmount * LAMPORTS_PER_SOL);
+      console.log(`Dynamic fee: ${lamports} lamports (${solAmount.toFixed(4)} SOL)`);
+      return lamports;
+    } else {
+      throw new Error('Invalid SOL price data');
+    }
+  } catch (error) {
+    console.error('Error fetching dynamic fee, using fallback:', error);
+    const fallbackLamports = Math.round(0.03 * LAMPORTS_PER_SOL);
+    console.log(`Fallback fee: ${fallbackLamports} lamports (0.03 SOL)`);
+    return fallbackLamports;
+  }
 }
 
 ///////// API ROUTES ////////
+
+// Create a new express application instance
+const app: express.Application = express();
+app.use(cors());
+
 app.get('/get_action', async (req, res) => {
     try {
       const payload: ActionGetResponse = {
@@ -446,7 +406,8 @@ app.get('/get_action', async (req, res) => {
           actions: [
             {
               label: "Mint NFT",
-              href: 'http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}', // dev href
+              // href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`, // prod href
+              href: `http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}`, // dev href
               parameters: [
                 {
                   name: "prompt",
@@ -509,7 +470,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
       const { blockhash } = await connection.getLatestBlockhash();
 
       // Get fee price
-      const mintingFee =  await getFeeInLamports(connection);
+      const mintingFee =  await getFeeInLamports();
       const mintingFeeSOL = mintingFee / LAMPORTS_PER_SOL;
       console.log(`Fee for this transaction -> ${mintingFee} lamports or ${mintingFeeSOL} SOL.`)
 
@@ -517,7 +478,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: user_account,
-          toPubkey: TREASURY_WALLET,
+          toPubkey: mintKeypair.publicKey,
           lamports: mintingFee,
         })
       );
@@ -532,8 +493,8 @@ app.post('/post_action', async (req: Request, res: Response) => {
       );
 
       // Set computational resources for transaction
-      transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
-      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }))
+      transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 20_000 }))
+      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100 }))
 
       // Set transaction's blockchash and fee payer
       transaction.recentBlockhash = blockhash;
@@ -548,52 +509,8 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
       res.status(200).json(payload);
 
-      const transactionSignature = await findTransactionWithMemo(connection, user_account, memo);
+      processPostTransaction(prompt, connection, user_account, memo, pre_memo, randomNumber)
 
-      if (transactionSignature) {
-        console.log(`Found transaction with memo: ${transactionSignature}`);
-        
-        // NFT logic -> AI
-        const llmSays = await generatePrompt(prompt);
-        console.log(`LLM prompt 🤖-> ${llmSays}`);
-
-        const CONFIG = await defineConfig(llmSays, randomNumber, pre_memo);
-        const imageName = `'${CONFIG.imgName}'`
-        console.log(`Image Name -> ${imageName}`)
-        
-        const imageLocation = await imagine(llmSays, randomNumber);
-        console.log(`Image successfully created 🎨`);
-
-        // MFT Logic -> Metaplex
-        const metaplex =  await createMetaplexInstance(connection, WALLET)
-        console.log(`Uploading your Image🔼`);
-        const imageUri = await uploadImage(imageLocation, "", connection, metaplex);
-
-        console.log(`Uploading the Metadata⏫`);
-        const metadataUri = await uploadMetadata(imageUri, CONFIG.imgType, CONFIG.imgName, CONFIG.description, CONFIG.attributes, connection, metaplex);
-        console.log(`Metadata URI -> ${metadataUri}`);
-
-        // Delete local image file
-        fs.unlink(imageLocation, (err) => {
-          if (err) {
-            console.error('Failed to delete the local image file:', err);
-          } else {
-            console.log(`Local image file deleted successfully 🗑️`);
-          }
-        });
-
-        console.log(`Minting your NFT🔨`);
-        const mintAddress = await mintProgrammableNft(metadataUri, CONFIG.imgName, CONFIG.sellerFeeBasisPoints, CONFIG.creators, connection, metaplex);
-        if (!mintAddress) {
-          throw new Error("Failed to mint the NFT. Mint address is undefined.");
-        }
-        
-        console.log(`Transferring your NFT 📬`);
-        const mintSend = await transferNFT(WALLET, user_account.toString(), mintAddress.toString(), connection, metaplex);
-        console.log(mintSend);
-      } else {
-        console.log('Transaction with memo not found within the timeout period');
-      }
     } else {
       res.status(400).json({ error: 'Invalid prompt detected please try again' })
     }
@@ -605,13 +522,85 @@ app.post('/post_action', async (req: Request, res: Response) => {
   }
 });
 
-// The port the express app will listen on
-const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
+async function processPostTransaction(prompt: string, connection: Connection, user_account:PublicKey, memo:string, pre_memo:string, randomNumber: number) {
 
-// Start dev server
+  const transactionSignature = await findTransactionWithMemo(connection, user_account, memo);
+
+  if (transactionSignature) {
+    console.log(`Found transaction with memo: ${transactionSignature}`);
+    try{
+
+      const llmSays = await generatePrompt(prompt);
+      console.log(`LLM prompt 🤖-> ${llmSays}`);
+
+      const CONFIG = await defineConfig(llmSays, randomNumber, pre_memo);
+      const imageName = `'${CONFIG.imgName}'`
+      console.log(`Image Name -> ${imageName}`)
+      
+      const imagePath = await imagine(llmSays, CONFIG, randomNumber);
+      console.log(`Image successfully created 🎨`);
+
+      console.log("Creating URI 🔗 ...");
+      const uri = await createURI(imagePath, CONFIG);
+      console.log("Metadata URI created:", uri);
+
+      // Delete local image file
+      fs.unlink(imagePath, (err) => {
+        if (err) {
+          console.error('Failed to delete the local image file:', err);
+        } else {
+          console.log(`Local image file deleted successfully 🗑️`);
+        }
+      });
+
+      console.log("Creating asset ⛏️ ...");
+      const uriConfig: UriConfig = { ...CONFIG, imageURI: uri };
+      const newAssetAddress = await createAsset(uriConfig);
+      const assetURL = uriConfig.imageURI;
+      console.log("Asset URL:", assetURL);
+
+      console.log(`Transferring your NFT 📬`);
+      const mintSend = await transferNFT(new PublicKey(newAssetAddress), user_account);
+      console.log(mintSend)
+    }
+    catch(error){
+      console.error("An error occurred in the post-transaction process:", error);
+      throw error;
+    }
+  } else {
+    console.log('Transaction with memo not found within the timeout period');
+  }
+}
+
+async function transferNFT(newAssetAddress: PublicKey, user_account: PublicKey) {
+  try {
+    const result = await transferV1(umi, {
+      asset: publicKey(newAssetAddress),
+      newOwner: publicKey(user_account)
+    }).sendAndConfirm(umi);
+
+    console.log(`NFT transferred to user: ${user_account}`);
+    return result.signature;
+  } catch (error) {
+    console.error('Error transferring NFT to user:', error);
+    throw error;
+  }
+}
+
+// // Start prod server
+// const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
+// app.listen(port, '0.0.0.0', () => {
+//   console.log(`Server is running on http://0.0.0.0:${port}`);
+//   console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/`)
+// });
+
+// export default app;
+
+// Initialize port and start dev server
+const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
 app.listen(port, () => {
   console.log(`Listening at http://localhost:${port}/`);
-  console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/devnet`)
+  console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/`)
 });
 
 export default app;
