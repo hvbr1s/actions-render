@@ -215,6 +215,7 @@ async function defineConfig(llmPrompt: string, randomNumber: number, memo: strin
     ]
   };
 
+
   return CONFIG;
 }
 
@@ -239,6 +240,7 @@ try {
   if (!imageUri) {
     throw new Error("Failed to upload image");
   }
+  console.log('Image uploaded, URI:', imageUri);
 
   // Add the image URI to the config
   const configWithUri: UriConfig = {
@@ -279,23 +281,17 @@ async function imagine(userPrompt: string, CONFIG: NFTConfig, randomNumber: numb
       responseType: 'arraybuffer'
     });
 
-  //   const imagePath = path.join('./image', `image_${randomNumber}.png`);
+    const imagePath = path.join(CONFIG.uploadPath, `${CONFIG.imgFileName}_${randomNumber}.png`);
 
-  //   // Write the image data to a file
-  //   fs.writeFileSync(imagePath, imageResponse.data);
-  //   return imagePath
+    // Ensure the directory exists
+    fs.mkdirSync(path.dirname(imagePath), { recursive: true });
 
-      // Use the CONFIG.uploadPath and imgFileName for consistency
-      const imagePath = path.join(CONFIG.uploadPath, `${CONFIG.imgFileName}_${randomNumber}.png`);
+    // Write the image data to a file
+    await fs.promises.writeFile(imagePath, imageResponse.data);
+    console.log(imagePath)
 
-      // Ensure the directory exists
-      fs.mkdirSync(path.dirname(imagePath), { recursive: true });
-
-      // Write the image data to a file
-      await fs.promises.writeFile(imagePath, imageResponse.data);
-      console.log(imagePath)
-
-      return imagePath;
+    return imagePath;
+    
   } catch (error) {
     console.error("Error in createImage:", error);
     throw error;
@@ -315,7 +311,7 @@ async function createAsset(CONFIG: UriConfig): Promise<string> {
       uri: CONFIG.imageURI,
     }).sendAndConfirm(umi);
 
-    console.log(result)
+    console.log('Transaction signature:', result.signature.toString());
     console.log(`Asset address: ${assetSigner.publicKey}`);
 
     return assetSigner.publicKey.toString();
@@ -509,7 +505,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
       res.status(200).json(payload);
 
-      processPostTransaction(prompt, connection, user_account, memo, pre_memo, randomNumber)
+      await processPostTransaction(prompt, connection, user_account, memo, pre_memo, randomNumber)
 
     } else {
       res.status(400).json({ error: 'Invalid prompt detected please try again' })
@@ -537,6 +533,7 @@ async function processPostTransaction(prompt: string, connection: Connection, us
       const imageName = `'${CONFIG.imgName}'`
       console.log(`Image Name -> ${imageName}`)
       
+      console.log("Creating image 🎨 ...");
       const imagePath = await imagine(llmSays, CONFIG, randomNumber);
       console.log(`Image successfully created 🎨`);
 
@@ -560,8 +557,13 @@ async function processPostTransaction(prompt: string, connection: Connection, us
       console.log("Asset URL:", assetURL);
 
       console.log(`Transferring your NFT 📬`);
-      const mintSend = await transferNFT(new PublicKey(newAssetAddress), user_account);
-      console.log(mintSend)
+      await transferNFT(new PublicKey(newAssetAddress), user_account);
+
+      // const seeAsset = await goFetch(newAssetAddress);
+      // console.log(seeAsset);
+  
+      console.log("Process completed successfully!");
+
     }
     catch(error){
       console.error("An error occurred in the post-transaction process:", error);
@@ -583,6 +585,29 @@ async function transferNFT(newAssetAddress: PublicKey, user_account: PublicKey) 
     return result.signature;
   } catch (error) {
     console.error('Error transferring NFT to user:', error);
+    throw error;
+  }
+}
+
+async function goFetch(assetAddress:string) {
+  try {
+    // Fetch the asset using the provided UMI instance
+    const asset = await fetchAsset(umi, assetAddress, {
+      skipDerivePlugins: false,
+    });
+
+    // Get the asset's URI
+    const assetLocation = asset.uri;
+
+    // Fetch the metadata from the asset's URI
+    const response = await axios.get(assetLocation);
+    
+    // Extract the imageURI from the metadata
+    const foundIt = response.data.imageURI;
+
+    return foundIt;
+  } catch (error) {
+    console.error('Error in goFetch:', error);
     throw error;
   }
 }
