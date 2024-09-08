@@ -409,7 +409,7 @@ app.get('/get_action', async (req, res) => {
         icon: new URL("https://i.imgur.com/Frju6Dq.png").toString(), // elephant background
         //icon: new URL("https://i.imgur.com/aFLHCnR.png").toString(), // kimono background
         label: "Mint NFT",
-        title: "Imagin'App 🌈🏔️",
+        title: "Imagin'App 🌈",
         description: "Describe and mint your own unique NFT",
         links: {
           actions: [
@@ -511,7 +511,10 @@ app.post('/post_action', async (req: Request, res: Response) => {
       const payload: ActionPostResponse = await createPostResponse({
         fields:{
         transaction: transaction,
-        message: `Your NFT is on the way, Wait a few minutes then check your wallet at https://solana.fm/address/${user_account}/nfts?cluster=mainnet-alpha `,
+        message: `
+        Your NFT is on the way! 
+        Wait a few minutes then check your wallet at https://solana.fm/    
+        `,
         },
       });
 
