@@ -12,7 +12,7 @@ import express, { Request, Response } from 'express';
 import Instructor from "@instructor-ai/instructor";
 import OpenAI from 'openai';
 import { z } from "zod";
-import {NFTConfig, UriConfig }  from './utils/interfaces'
+import { NFTConfig }  from './utils/interfaces'
 
 // Solana-related imports
 import { 
@@ -381,7 +381,7 @@ async function getFeeInLamports(): Promise<number> {
     const solPrice = data.solana.usd;
 
     if (solPrice && typeof solPrice === 'number' && solPrice > 0) {
-      const solAmount = 0.10 / solPrice; //target fee $2
+      const solAmount = 2 / solPrice; //target fee $2
       const lamports = Math.round(solAmount * LAMPORTS_PER_SOL);
       console.log(`Dynamic fee: ${lamports} lamports (${solAmount.toFixed(4)} SOL)`);
       return lamports;
@@ -390,8 +390,8 @@ async function getFeeInLamports(): Promise<number> {
     }
   } catch (error) {
     console.error('Error fetching dynamic fee, using fallback:', error);
-    const fallbackLamports = Math.round(0.0002 * LAMPORTS_PER_SOL);
-    console.log(`Fallback fee: ${fallbackLamports} lamports (0.03 SOL)`);
+    const fallbackLamports = Math.round(0.02 * LAMPORTS_PER_SOL);
+    console.log(`Fallback fee: ${fallbackLamports} lamports`);
     return fallbackLamports;
   }
 }
