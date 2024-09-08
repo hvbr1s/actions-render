@@ -12,8 +12,7 @@ import express, { Request, Response } from 'express';
 import Instructor from "@instructor-ai/instructor";
 import OpenAI from 'openai';
 import { z } from "zod";
-import Groq from "groq-sdk";
-import { NFTConfig, UriConfig }  from './utils/interfaces'
+import {NFTConfig, UriConfig }  from './utils/interfaces'
 
 // Solana-related imports
 import { 
@@ -37,7 +36,7 @@ import {
 } from '@solana/web3.js';
 // Metaplex-related imports
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
-import { publicKey } from '@metaplex-foundation/umi';
+import { publicKey, createGenericFile, } from '@metaplex-foundation/umi';
 import { mplCore, transferV1, create, fetchAsset } from '@metaplex-foundation/mpl-core';
 import { irysUploader } from '@metaplex-foundation/umi-uploader-irys';
 import { keypairIdentity, generateSigner, GenericFile } from '@metaplex-foundation/umi';
@@ -46,8 +45,8 @@ import { keypairIdentity, generateSigner, GenericFile } from '@metaplex-foundati
 dotenv.config();
 
 //// UMI INIT /////
-// const QUICKNODE_RPC = `https://winter-solemn-sun.solana-mainnet.quiknode.pro/${QUICKNODE_MAINNET_KEY}/`; // mainnet
-const QUICKNODE_RPC = `https://fragrant-ancient-needle.solana-devnet.quiknode.pro/${process.env.QUICKNODE_DEVNET_KEY}/`; // devnet 
+const QUICKNODE_RPC = `https://winter-solemn-sun.solana-mainnet.quiknode.pro/${process.env.QUICKNODE_MAINNET_KEY}/`; // mainnet
+//const QUICKNODE_RPC = `https://fragrant-ancient-needle.solana-devnet.quiknode.pro/${process.env.QUICKNODE_DEVNET_KEY}/`; // devnet 
 const newUMI = createUmi(QUICKNODE_RPC)
 
 // Load wallet
@@ -83,13 +82,11 @@ async function createNewConnection(rpcUrl: string){
 
 ///// AI LOGIC
 const oai_client = new OpenAI({apiKey: process.env['OPENAI_API_KEY']});
-const groq_client = new Groq({ apiKey: process.env['GROQ_API_KEY'] });
 const gpt_llm = "gpt-4o-2024-08-06"
-const llama_llm = "llama-3.1-70b-versatile"
 
 // Prepare Instructor
 const instructor_client = Instructor({
-  client: groq_client,
+  client: oai_client,
   mode: "FUNCTIONS"
 })
 
@@ -107,7 +104,7 @@ async function safePrompting(userPrompt: string){
             content: userPrompt
         }
     ],
-    model: llama_llm,
+    model: gpt_llm,
     temperature: 0.0,
     response_model: { 
       schema: UserSchema, 
@@ -115,14 +112,14 @@ async function safePrompting(userPrompt: string){
     }
   });
   
-// Print the completion returned by the LLM.
-const safetyCheckResponse = llmSafetyCheck.safety.toLowerCase();
-console.log(`The prompt is ${safetyCheckResponse} 👮`)
-return safetyCheckResponse;
+  const safetyCheckResponse = llmSafetyCheck.safety.toLowerCase();
+  console.log(`The prompt is ${safetyCheckResponse} 👮`)
+
+  return safetyCheckResponse;
 }
 
 async function generatePrompt(userPrompt: string) {
-  const llmResponse = await groq_client.chat.completions.create({
+  const llmResponse = await oai_client.chat.completions.create({
       messages: [
           {
               role: "system",
@@ -144,12 +141,12 @@ async function generatePrompt(userPrompt: string) {
               content: userPrompt
           }
       ],
-      model: llama_llm,
+      model: gpt_llm,
       temperature: 0.5
   });
 
-  // Print the completion returned by the LLM.
   const parsedresponse = JSON.stringify(llmResponse.choices[0]?.message?.content || "");
+
   return parsedresponse;
 }
 
@@ -188,20 +185,49 @@ async function defineConfig(llmPrompt: string, randomNumber: number, memo: strin
   // Extract the completion returned by the LLM and parse it.
   const llmResponse = JSON.parse(nftAttributes.choices[0]?.message?.content || "{}");
 
-  const CONFIG: NFTConfig = {
+  const config: NFTConfig = {
+    // File handling properties
     uploadPath: './image/',
     imgFileName: `image${randomNumber}.png`,
     imgType: 'image/png',
-    imgName: llmResponse.one_word_title || 'Art', 
+  
+    // NFT metadata properties
+    imgName: llmResponse.one_word_title || 'Art',
     description: llmResponse.description || "Random AI Art",
+    image: '', // This will be set after the image is uploaded
     attributes: [
-        {trait_type: 'Haiku', value:llmResponse.haiku ||''},
-        {trait_type: 'Note', value: memo ||''}
-    ]
+      { trait_type: 'Haiku', value: llmResponse.haiku || '' },
+      { trait_type: 'Note', value: memo || '' }
+    ],
+    properties: {
+      files: [
+        {
+          uri: '', // This will be set after the image is uploaded
+          type: 'image/png',
+        },
+      ],
+      category: 'image',
+    },
   };
+  
+  return config;
 
+}
 
-  return CONFIG;
+async function updateConfigWithImageUri(config: NFTConfig, imageUri: string): Promise<NFTConfig> {
+  return {
+    ...config,
+    image: imageUri,
+    properties: {
+      ...config.properties,
+      files: [
+        {
+          uri: imageUri,
+          type: config.imgType,
+        },
+      ],
+    },
+  };
 }
 
 async function createURI(imagePath: string, CONFIG: NFTConfig): Promise<string> {
@@ -210,28 +236,28 @@ try {
   const imageBuffer = await promise.readFile(imagePath);
 
   // Create a GenericFile object
-  const imageFile: GenericFile = {
-    buffer: imageBuffer,
-    fileName: CONFIG.imgFileName,
-    displayName: CONFIG.imgName,
-    uniqueName: CONFIG.imgFileName,
-    contentType: CONFIG.imgType,
-    extension: 'png',
-    tags: [],
-  };
+  const umiImageFile = createGenericFile(
+    imageBuffer,
+    CONFIG.imgFileName,
+    {
+      displayName: CONFIG.imgName,
+      uniqueName: CONFIG.imgFileName,
+      contentType: CONFIG.imgType,
+      extension: CONFIG.imgFileName.split('.').pop() || 'png',
+      tags: [{ name: 'Content-Type', value: CONFIG.imgType }],
+    }
+  );
 
   // Upload the image and get its URI
-  const [imageUri] = await umi.uploader.upload([imageFile]);
+  const [imageUri] = await umi.uploader.upload([umiImageFile]);
   if (!imageUri) {
     throw new Error("Failed to upload image");
   }
   console.log('Image uploaded, URI:', imageUri);
 
   // Add the image URI to the config
-  const configWithUri: UriConfig = {
-    ...CONFIG,
-    imageURI: imageUri,
-  };
+  const configWithUri = await updateConfigWithImageUri(CONFIG, imageUri)
+  console.log(configWithUri)
 
   // Upload the JSON metadata
   const metadataUri = await umi.uploader.uploadJson(configWithUri);
@@ -240,6 +266,7 @@ try {
   }
 
   return metadataUri;
+
 } catch (error) {
   console.error("Error in createURI:", error);
   throw error;
@@ -284,19 +311,20 @@ async function imagine(userPrompt: string, CONFIG: NFTConfig, randomNumber: numb
 
 }
 
-async function createAsset(CONFIG: UriConfig): Promise<string> {
+async function createAsset(CONFIG: NFTConfig): Promise<string> {
   try {
     // Generate a new signer for the asset
     const assetSigner = generateSigner(umi);
+    const metadataUri = CONFIG.properties.files[0].uri
+    console.log(`Creating asset with metadata: ${metadataUri}`)
 
     // Create the asset
     const result = await create(umi, {
       asset: assetSigner,
       name: CONFIG.imgName,
-      uri: CONFIG.imageURI,
+      uri: metadataUri,
     }).sendAndConfirm(umi);
 
-    console.log('Transaction signature:', result.signature.toString());
     console.log(`Asset address: ${assetSigner.publicKey}`);
 
     return assetSigner.publicKey.toString();
@@ -354,7 +382,7 @@ async function getFeeInLamports(): Promise<number> {
     const solPrice = data.solana.usd;
 
     if (solPrice && typeof solPrice === 'number' && solPrice > 0) {
-      const solAmount = 2 / solPrice; //target fee $5
+      const solAmount = 0.10 / solPrice; //target fee $2
       const lamports = Math.round(solAmount * LAMPORTS_PER_SOL);
       console.log(`Dynamic fee: ${lamports} lamports (${solAmount.toFixed(4)} SOL)`);
       return lamports;
@@ -363,7 +391,7 @@ async function getFeeInLamports(): Promise<number> {
     }
   } catch (error) {
     console.error('Error fetching dynamic fee, using fallback:', error);
-    const fallbackLamports = Math.round(0.03 * LAMPORTS_PER_SOL);
+    const fallbackLamports = Math.round(0.0002 * LAMPORTS_PER_SOL);
     console.log(`Fallback fee: ${fallbackLamports} lamports (0.03 SOL)`);
     return fallbackLamports;
   }
@@ -378,8 +406,8 @@ app.use(cors());
 app.get('/get_action', async (req, res) => {
     try {
       const payload: ActionGetResponse = {
-        //icon: new URL("https://i.imgur.com/Frju6Dq.png").toString(), // elephant background
-        icon: new URL("https://i.imgur.com/aFLHCnR.png").toString(), // kimono background
+        icon: new URL("https://i.imgur.com/Frju6Dq.png").toString(), // elephant background
+        //icon: new URL("https://i.imgur.com/aFLHCnR.png").toString(), // kimono background
         label: "Mint NFT",
         title: "Imagin'App 🌈🏔️",
         description: "Describe and mint your own unique NFT",
