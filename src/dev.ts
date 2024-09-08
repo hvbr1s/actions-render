@@ -13,6 +13,7 @@ import Instructor from "@instructor-ai/instructor";
 import OpenAI from 'openai';
 import { z } from "zod";
 import Groq from "groq-sdk";
+import { NFTConfig, UriConfig }  from './utils/interfaces'
 
 // Solana-related imports
 import { 
@@ -150,22 +151,6 @@ async function generatePrompt(userPrompt: string) {
   // Print the completion returned by the LLM.
   const parsedresponse = JSON.stringify(llmResponse.choices[0]?.message?.content || "");
   return parsedresponse;
-}
-
-interface NFTConfig {
-  uploadPath: string;
-  imgFileName: string;
-  imgType: string;
-  imgName: string;
-  description: string;
-  attributes: Array<{
-    trait_type: string;
-    value: string;
-  }>;
-}
-
-interface UriConfig extends NFTConfig {
-  imageURI: string;
 }
 
 async function defineConfig(llmPrompt: string, randomNumber: number, memo: string) {
@@ -535,6 +520,7 @@ async function processPostTransaction(prompt: string, connection: Connection, us
       
       console.log("Creating image 🎨 ...");
       const imagePath = await imagine(llmSays, CONFIG, randomNumber);
+      console.log(imagePath)
       console.log(`Image successfully created 🎨`);
 
       console.log("Creating URI 🔗 ...");
