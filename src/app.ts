@@ -34,12 +34,13 @@ import {
   TransactionInstruction, 
   TransactionSignature,
 } from '@solana/web3.js';
+
 // Metaplex-related imports
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { publicKey, createGenericFile, } from '@metaplex-foundation/umi';
 import { mplCore, transferV1, create, fetchAsset } from '@metaplex-foundation/mpl-core';
 import { irysUploader } from '@metaplex-foundation/umi-uploader-irys';
-import { keypairIdentity, generateSigner, GenericFile } from '@metaplex-foundation/umi';
+import { keypairIdentity, generateSigner } from '@metaplex-foundation/umi';
 
 // Load environment variable
 dotenv.config();
@@ -192,8 +193,8 @@ async function defineConfig(llmPrompt: string, randomNumber: number, memo: strin
     imgType: 'image/png',
   
     // NFT metadata properties
-    imgName: llmResponse.one_word_title || 'Art',
-    description: llmResponse.description || "Random AI Art",
+    imgName: llmResponse.one_word_title || '',
+    description: llmResponse.description || '',
     image: '', // This will be set after the image is uploaded
     attributes: [
       { trait_type: 'Haiku', value: llmResponse.haiku || '' },
@@ -293,7 +294,7 @@ async function imagine(userPrompt: string, CONFIG: NFTConfig, randomNumber: numb
       responseType: 'arraybuffer'
     });
 
-    const imagePath = path.join(CONFIG.uploadPath, `${CONFIG.imgFileName}_${randomNumber}.png`);
+    const imagePath = path.join(CONFIG.uploadPath, `${CONFIG.imgName}_${randomNumber}.png`);
 
     // Ensure the directory exists
     fs.mkdirSync(path.dirname(imagePath), { recursive: true });
@@ -431,7 +432,7 @@ app.get('/get_action', async (req, res) => {
           ]
         },
         error:{
-          message: "⚠️ A single mint costs $10 USD, payable in SOL.\nThis blink is still in beta, use at your own risks!"
+          message: "⚠️ A single mint costs $3 USD, payable in SOL.\nThis blink is still in beta, use at your own risks!"
         },
       };
   
@@ -510,7 +511,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
       const payload: ActionPostResponse = await createPostResponse({
         fields:{
         transaction: transaction,
-        message: "Your NFT is on the way, check your wallet in a few minutes!",
+        message: `Your NFT is on the way, Wait a few minutes then check your wallet at https://solana.fm/address/${user_account}/nfts?cluster=mainnet-alpha `,
         },
       });
 
@@ -547,7 +548,6 @@ async function processPostTransaction(prompt: string, connection: Connection, us
       console.log("Creating image 🎨 ...");
       const imagePath = await imagine(llmSays, CONFIG, randomNumber);
       console.log(imagePath)
-      console.log(`Image successfully created 🎨`);
 
       console.log("Creating URI 🔗 ...");
       const uri = await createURI(imagePath, CONFIG);
@@ -564,7 +564,6 @@ async function processPostTransaction(prompt: string, connection: Connection, us
 
       console.log("Creating asset ⛏️ ...");
       const newAssetAddress = await createAsset(CONFIG, uri);
-      const assetURL = CONFIG.image;
 
       console.log(`Transferring your NFT 📬`);
       await transferNFT(new PublicKey(newAssetAddress), user_account);
