@@ -311,18 +311,17 @@ async function imagine(userPrompt: string, CONFIG: NFTConfig, randomNumber: numb
 
 }
 
-async function createAsset(CONFIG: NFTConfig): Promise<string> {
+async function createAsset(CONFIG: NFTConfig, uri: string): Promise<string> {
   try {
     // Generate a new signer for the asset
     const assetSigner = generateSigner(umi);
-    const metadataUri = CONFIG.properties.files[0].uri
-    console.log(`Creating asset with metadata: ${metadataUri}`)
+    console.log(`Creating asset with metadata: ${uri}`)
 
     // Create the asset
     const result = await create(umi, {
       asset: assetSigner,
       name: CONFIG.imgName,
-      uri: metadataUri,
+      uri: uri,
     }).sendAndConfirm(umi);
 
     console.log(`Asset address: ${assetSigner.publicKey}`);
@@ -565,10 +564,8 @@ async function processPostTransaction(prompt: string, connection: Connection, us
       });
 
       console.log("Creating asset ⛏️ ...");
-      const uriConfig: UriConfig = { ...CONFIG, imageURI: uri };
-      const newAssetAddress = await createAsset(uriConfig);
-      const assetURL = uriConfig.imageURI;
-      console.log("Asset URL:", assetURL);
+      const newAssetAddress = await createAsset(CONFIG, uri);
+      const assetURL = CONFIG.image;
 
       console.log(`Transferring your NFT 📬`);
       await transferNFT(new PublicKey(newAssetAddress), user_account);
