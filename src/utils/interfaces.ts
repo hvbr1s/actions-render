@@ -1,9 +1,7 @@
 export interface NFTConfig {
-
   uploadPath: string;
   imgFileName: string;
   imgType: string;
-
   imgName: string;
   description: string;
   image: string;
