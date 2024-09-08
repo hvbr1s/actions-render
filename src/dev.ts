@@ -12,7 +12,7 @@ import express, { Request, Response } from 'express';
 import Instructor from "@instructor-ai/instructor";
 import OpenAI from 'openai';
 import { z } from "zod";
-import {NFTConfig, UriConfig }  from './utils/interfaces'
+import { NFTConfig }  from './utils/interfaces'
 
 // Solana-related imports
 import { 
@@ -565,14 +565,10 @@ async function processPostTransaction(prompt: string, connection: Connection, us
 
       console.log("Creating asset ⛏️ ...");
       const newAssetAddress = await createAsset(CONFIG, uri);
-      const assetURL = CONFIG.image;
 
       console.log(`Transferring your NFT 📬`);
       await transferNFT(new PublicKey(newAssetAddress), user_account);
 
-      // const seeAsset = await goFetch(newAssetAddress);
-      // console.log(seeAsset);
-  
       console.log("Process completed successfully!");
 
     }
