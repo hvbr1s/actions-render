@@ -409,7 +409,7 @@ app.get('/get_action', async (req, res) => {
         //icon: new URL("https://i.imgur.com/aFLHCnR.png").toString(), // kimono background
         label: "Mint NFT",
         title: "Imagin'App 🌈🏔️",
-        description: "Describe and mint your own unique NFT",
+        description: "AI-Assisted NFT Mint",
         links: {
           actions: [
             {
