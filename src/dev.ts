@@ -45,8 +45,8 @@ import { keypairIdentity, generateSigner, GenericFile } from '@metaplex-foundati
 dotenv.config();
 
 //// UMI INIT /////
-// const QUICKNODE_RPC = `https://winter-solemn-sun.solana-mainnet.quiknode.pro/${process.env.QUICKNODE_MAINNET_KEY}/`; // mainnet
-const QUICKNODE_RPC = `https://fragrant-ancient-needle.solana-devnet.quiknode.pro/${process.env.QUICKNODE_DEVNET_KEY}/`; // devnet 
+const QUICKNODE_RPC = `https://winter-solemn-sun.solana-mainnet.quiknode.pro/${process.env.QUICKNODE_MAINNET_KEY}/`; // mainnet
+//const QUICKNODE_RPC = `https://fragrant-ancient-needle.solana-devnet.quiknode.pro/${process.env.QUICKNODE_DEVNET_KEY}/`; // devnet 
 const newUMI = createUmi(QUICKNODE_RPC)
 
 // Load wallet
@@ -409,7 +409,7 @@ app.get('/get_action', async (req, res) => {
         //icon: new URL("https://i.imgur.com/aFLHCnR.png").toString(), // kimono background
         label: "Mint NFT",
         title: "Imagin'App 🌈",
-        description: "AI-assisted NFT mint",
+        description: "AI-Assisted NFT mint",
         links: {
           actions: [
             {
@@ -509,20 +509,22 @@ app.post('/post_action', async (req: Request, res: Response) => {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = user_account;
 
-      const payload: ActionPostResponse = await createPostResponse({
+      let payload: ActionPostResponse = await createPostResponse({
         fields:{
         transaction: transaction,
-        message: `
-        Your NFT is on the way!
-        Wait a few minutes then check your wallet!
-        `,
-        type: 'transaction',
+        message: `Your NFT is on the way, Wait a few minutes then check your wallet!`,
+        type: 'transaction'
         },
       });
 
       res.status(200).json(payload);
 
-      await processPostTransaction(prompt, connection, user_account, memo, pre_memo, randomNumber)
+      if (payload){
+        await processPostTransaction(prompt, connection, user_account, memo, pre_memo, randomNumber)
+      }
+      else{
+        res.status(400).json({ error: 'Invalid payload' })
+      }
 
     } else {
       res.status(400).json({ error: 'Invalid prompt detected please try again' })
