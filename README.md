@@ -15,7 +15,3 @@ Create personalized NFTs with ease using Astrophant Blink on Solana! 🌌✨
 5. **Wait for Minting**: Sit tight! Your NFT will be ready in a few minutes.
 6. **View Your NFT**: Use [Solana FM](https://solana.fm/?cluster=mainnet-alpha) or the [Core Explorer](https://core.metaplex.com/explorer) to see your newly minted NFT.
 7. **Enjoy Your Creation!** 🎉
-
----
-
-This revised README has a clearer structure, adds a touch of excitement with emoji usage, and provides a more engaging introduction to the project. Let me know if you'd like any further adjustments!
