@@ -509,7 +509,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = user_account;
 
-      const payload: ActionPostResponse = await createPostResponse({
+      let payload: ActionPostResponse = await createPostResponse({
         fields:{
         transaction: transaction,
         message: `Your NFT is on the way, Wait a few minutes then check your wallet!`,
@@ -519,11 +519,13 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
       res.status(200).json(payload);
 
-      await processPostTransaction(prompt, connection, user_account, memo, pre_memo, randomNumber)
+      if (payload && prompt && prompt.trim() !== '' && prompt !== '{prompt}'){
+        await processPostTransaction(prompt, connection, user_account, memo, pre_memo, randomNumber)
+      }
+      else{
+        res.status(400).json({ error: 'Invalid payload' })
+      }
 
-    } else {
-      res.status(400).json({ error: 'Invalid prompt detected please try again' })
-    }
   } catch (err) {
     console.error(err);
     let message = "An unknown error occurred";
@@ -569,9 +571,6 @@ async function processPostTransaction(prompt: string, connection: Connection, us
 
       console.log(`Transferring your NFT 📬`);
       await transferNFT(new PublicKey(newAssetAddress), user_account);
-
-      // const seeAsset = await goFetch(newAssetAddress);
-      // console.log(seeAsset);
   
       console.log("Process completed successfully!");
 
@@ -596,29 +595,6 @@ async function transferNFT(newAssetAddress: PublicKey, user_account: PublicKey) 
     return result.signature;
   } catch (error) {
     console.error('Error transferring NFT to user:', error);
-    throw error;
-  }
-}
-
-async function goFetch(assetAddress:string) {
-  try {
-    // Fetch the asset using the provided UMI instance
-    const asset = await fetchAsset(umi, assetAddress, {
-      skipDerivePlugins: false,
-    });
-
-    // Get the asset's URI
-    const assetLocation = asset.uri;
-
-    // Fetch the metadata from the asset's URI
-    const response = await axios.get(assetLocation);
-    
-    // Extract the imageURI from the metadata
-    const foundIt = response.data.imageURI;
-
-    return foundIt;
-  } catch (error) {
-    console.error('Error in goFetch:', error);
     throw error;
   }
 }
