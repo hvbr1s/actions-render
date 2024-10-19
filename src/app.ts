@@ -406,10 +406,10 @@ app.use(cors());
 app.get('/get_action', async (req, res) => {
     try {
       const payload: ActionGetResponse = {
-        icon: new URL("https://i.imgur.com/Frju6Dq.png").toString(), // elephant background
-        //icon: new URL("https://i.imgur.com/aFLHCnR.png").toString(), // kimono background
+        //icon: new URL("https://i.imgur.com/Frju6Dq.png").toString(), // elephant background
+        icon: new URL("https://i.imgur.com/02jEt0P.png").toString(), // astrophant background
         label: "Mint NFT",
-        title: "Imagin'App 🌈🏔️",
+        title: "Astrophant 🐘🪐",
         description: "AI-Powered NFT Mint",
         links: {
           actions: [
