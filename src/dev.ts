@@ -45,8 +45,8 @@ import { keypairIdentity, generateSigner, GenericFile } from '@metaplex-foundati
 dotenv.config();
 
 //// UMI INIT /////
-const QUICKNODE_RPC = `https://winter-solemn-sun.solana-mainnet.quiknode.pro/${process.env.QUICKNODE_MAINNET_KEY}/`; // mainnet
-//const QUICKNODE_RPC = `https://fragrant-ancient-needle.solana-devnet.quiknode.pro/${process.env.QUICKNODE_DEVNET_KEY}/`; // devnet 
+// const QUICKNODE_RPC = `https://winter-solemn-sun.solana-mainnet.quiknode.pro/${process.env.QUICKNODE_MAINNET_KEY}/`; // mainnet
+const QUICKNODE_RPC = `https://fragrant-ancient-needle.solana-devnet.quiknode.pro/${process.env.QUICKNODE_DEVNET_KEY}/`; // devnet 
 const newUMI = createUmi(QUICKNODE_RPC)
 
 // Load wallet
@@ -282,7 +282,7 @@ async function imagine(userPrompt: string, CONFIG: NFTConfig, randomNumber: numb
       prompt: userPrompt + ' . Begin!',
       n: 1,
       size: "1024x1024",
-      quality:'standard' // OR 'hd'
+      quality:'standard'
     });
     const imageUrl = response.data[0].url;
 
@@ -293,7 +293,7 @@ async function imagine(userPrompt: string, CONFIG: NFTConfig, randomNumber: numb
       responseType: 'arraybuffer'
     });
 
-    const imagePath = path.join(CONFIG.uploadPath, `${CONFIG.imgFileName}_${randomNumber}.png`);
+    const imagePath = path.join(CONFIG.uploadPath, `${CONFIG.imgName}_${randomNumber}.png`);
 
     // Ensure the directory exists
     fs.mkdirSync(path.dirname(imagePath), { recursive: true });
@@ -408,11 +408,12 @@ app.get('/get_action', async (req, res) => {
         icon: new URL("https://i.imgur.com/Frju6Dq.png").toString(), // elephant background
         //icon: new URL("https://i.imgur.com/aFLHCnR.png").toString(), // kimono background
         label: "Mint NFT",
-        title: "Imagin'App 🌈🏔️",
-        description: "AI-Assisted NFT Mint",
+        title: "Imagin'App 🌈",
+        description: "AI-assisted NFT mint",
         links: {
           actions: [
             {
+              type: "transaction",
               label: "Mint NFT",
               // href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`, // prod href
               href: `http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}`, // dev href
@@ -432,7 +433,7 @@ app.get('/get_action', async (req, res) => {
           ]
         },
         error:{
-          message: "⚠️ A single mint costs $10 USD, payable in SOL.\nThis blink is still in beta, use at your own risks!"
+          message: "⚠️ A single mint costs $2 USD, payable in SOL.\nThis blink is still in beta, use at your own risks!"
         },
       };
   
@@ -511,7 +512,11 @@ app.post('/post_action', async (req: Request, res: Response) => {
       const payload: ActionPostResponse = await createPostResponse({
         fields:{
         transaction: transaction,
-        message: "Your NFT is on the way, check your wallet in a few minutes!",
+        message: `
+        Your NFT is on the way!
+        Wait a few minutes then check your wallet!
+        `,
+        type: 'transaction',
         },
       });
 
