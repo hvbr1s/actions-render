@@ -1,10 +1,7 @@
-// Node.js built-in modules
 import * as fs from 'fs';
 import { promises as promise } from 'fs';
 import * as path from 'path';
 import fetch from 'node-fetch';
-
-// Third-party modules
 import axios from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -13,8 +10,6 @@ import Instructor from "@instructor-ai/instructor";
 import OpenAI from 'openai';
 import { z } from "zod";
 import { NFTConfig }  from './utils/interfaces'
-
-// Solana-related imports
 import { 
   ACTIONS_CORS_HEADERS, 
   ActionGetResponse, 
