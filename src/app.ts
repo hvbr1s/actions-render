@@ -515,15 +515,13 @@ app.post('/post_action', async (req: Request, res: Response) => {
       res.status(200).json(payload);
       
       if (payload && prompt && prompt.trim() !== '' && prompt !== '{prompt}'){
+        res.status(200).json(payload);
+
         await processPostTransaction(prompt, connection, user_account, memo, pre_memo, randomNumber)
       }
       else{
         res.status(400).json({ error: 'Invalid payload' })
       }
-
-    } else {
-      res.status(400).json({ error: 'Invalid prompt detected please try again' })
-    }
 
   } catch (err) {
     console.error(err);
