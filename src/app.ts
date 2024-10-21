@@ -1,39 +1,20 @@
 import * as fs from 'fs';
-import { promises as promise } from 'fs';
 import * as path from 'path';
-import fetch from 'node-fetch';
 import axios from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
-import Instructor from "@instructor-ai/instructor";
 import OpenAI from 'openai';
-import { z } from "zod";
-import { NFTConfig }  from './utils/interfaces'
-import { 
-  ACTIONS_CORS_HEADERS, 
-  ActionGetResponse, 
-  ActionPostRequest, 
-  ActionPostResponse, 
-  createPostResponse 
-} from '@solana/actions';
+import { promises as promise } from 'fs';
+import { getFeeInLamports } from './utils/fee' 
+import { NFTConfig } from './utils/interfaces'
+import { safePrompting } from './utils/safety'
+import * as actions from '@solana/actions'
+import * as web3 from '@solana/web3.js'
 import { MEMO_PROGRAM_ID } from '@solana/spl-memo';
-import { 
-  Connection, 
-  ComputeBudgetProgram,
-  Keypair, 
-  LAMPORTS_PER_SOL,
-  PublicKey, 
-  SystemProgram,
-  Transaction, 
-  TransactionInstruction, 
-  TransactionSignature,
-} from '@solana/web3.js';
-
-// Metaplex-related imports
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { publicKey, createGenericFile, } from '@metaplex-foundation/umi';
-import { mplCore, transferV1, create, fetchAsset } from '@metaplex-foundation/mpl-core';
+import { mplCore, transferV1, create } from '@metaplex-foundation/mpl-core';
 import { irysUploader } from '@metaplex-foundation/umi-uploader-irys';
 import { keypairIdentity, generateSigner } from '@metaplex-foundation/umi';
 
@@ -57,7 +38,7 @@ function getKeypairFromEnvironment(): Uint8Array {
   return new Uint8Array(privateKeyArray);
 }
 const secretKey = getKeypairFromEnvironment()
-const mintKeypair = Keypair.fromSecretKey(secretKey);
+const mintKeypair = web3.Keypair.fromSecretKey(secretKey);
 
 // Initialize UMI instance with wallet
 const keypair = newUMI.eddsa.createKeypairFromSecretKey(new Uint8Array(secretKey))
@@ -71,7 +52,7 @@ const umi = newUMI
 // Solana connection handler
 async function createNewConnection(rpcUrl: string){
   console.log(`Connecting to Solana...🔌`)
-  const connection = await new Connection(rpcUrl)
+  const connection = await new web3.Connection(rpcUrl)
   console.log(`Connection to Solana established🔌✅`)
   return connection;
 }
@@ -79,40 +60,6 @@ async function createNewConnection(rpcUrl: string){
 ///// AI LOGIC
 const oai_client = new OpenAI({apiKey: process.env['OPENAI_API_KEY']});
 const gpt_llm = "gpt-4o-2024-08-06"
-
-// Prepare Instructor
-const instructor_client = Instructor({
-  client: oai_client,
-  mode: "FUNCTIONS"
-})
-
-const UserSchema = z.object({
-  prompt: z.string(), 
-  safety: z.string().describe("Is the prompt 'safe' or 'unsafe'? An unsafe prompt contains reference to sexual violence, child abuse or scams. A safe prompt does not")
-})
-
-// Initialize safety check
-async function safePrompting(userPrompt: string){
-  const llmSafetyCheck = await instructor_client.chat.completions.create({
-    messages: [
-        {
-            role: "user",
-            content: userPrompt
-        }
-    ],
-    model: gpt_llm,
-    temperature: 0.0,
-    response_model: { 
-      schema: UserSchema, 
-      name: "Safety Check"
-    }
-  });
-  
-  const safetyCheckResponse = llmSafetyCheck.safety.toLowerCase();
-  console.log(`The prompt is ${safetyCheckResponse} 👮`)
-
-  return safetyCheckResponse;
-}
 
 async function generatePrompt(userPrompt: string) {
   const llmResponse = await oai_client.chat.completions.create({
@@ -329,7 +276,7 @@ async function createAsset(CONFIG: NFTConfig, uri: string): Promise<string> {
   }
 }
 
-async function findTransactionWithMemo(connection: Connection, userAccount: PublicKey, memo: string): Promise<TransactionSignature | null> {
+async function findTransactionWithMemo(connection: web3.Connection, userAccount: web3.PublicKey, memo: string): Promise<web3.TransactionSignature | null> {
   const maxChecks = 10;
   let checkCount = 0;
 
@@ -366,32 +313,6 @@ async function findTransactionWithMemo(connection: Connection, userAccount: Publ
   return null;
 }
 
-// Fee setting function
-async function getFeeInLamports(): Promise<number> {
-  try {
-    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    const solPrice = data.solana.usd;
-
-    if (solPrice && typeof solPrice === 'number' && solPrice > 0) {
-      const solAmount = 2 / solPrice; //target fee $2
-      const lamports = Math.round(solAmount * LAMPORTS_PER_SOL);
-      console.log(`Dynamic fee: ${lamports} lamports (${solAmount.toFixed(4)} SOL)`);
-      return lamports;
-    } else {
-      throw new Error('Invalid SOL price data');
-    }
-  } catch (error) {
-    console.error('Error fetching dynamic fee, using fallback:', error);
-    const fallbackLamports = Math.round(0.02 * LAMPORTS_PER_SOL);
-    console.log(`Fallback fee: ${fallbackLamports} lamports`);
-    return fallbackLamports;
-  }
-}
-
 ///////// API ROUTES ////////
 
 // Create a new express application instance
@@ -400,8 +321,7 @@ app.use(cors());
 
 app.get('/get_action', async (req, res) => {
     try {
-      const payload: ActionGetResponse = {
-        //icon: new URL("https://i.imgur.com/Frju6Dq.png").toString(), // elephant background
+      const payload: actions.ActionGetResponse = {
         icon: new URL("https://i.imgur.com/02jEt0P.png").toString(), // astrophant background
         label: "Mint NFT",
         title: "Astrophant 🐘🪐",
@@ -412,6 +332,7 @@ app.get('/get_action', async (req, res) => {
               type: "transaction",
               label: "Mint NFT",
               href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`, // prod href
+              //href: `http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}`, // dev href
               parameters: [
                 {
                   name: "prompt",
@@ -432,7 +353,7 @@ app.get('/get_action', async (req, res) => {
         },
       };
   
-      res.header(ACTIONS_CORS_HEADERS).status(200).json(payload);
+      res.header(actions.ACTIONS_CORS_HEADERS).status(200).json(payload);
     } catch (error) {
       console.error("Error handling GET request:", error);
       res.status(500).json({ error: "Internal Server Error" });
@@ -440,7 +361,7 @@ app.get('/get_action', async (req, res) => {
 });
 
 app.options('/post_action', (req: Request, res: Response) => {
-  res.header(ACTIONS_CORS_HEADERS).status(200).end();
+  res.header(actions.ACTIONS_CORS_HEADERS).status(200).end();
 });
 
 app.use(express.json());
@@ -457,7 +378,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
     console.log('User random memo:', memo);
 
     // Validate body
-    const body: ActionPostRequest = req.body;
+    const body: actions.ActionPostRequest = req.body;
 
     // Perform safety check
     const safetyCheck = await safePrompting(prompt);
@@ -466,9 +387,9 @@ app.post('/post_action', async (req: Request, res: Response) => {
     }
 
     // Validate and create user account
-    let userAccount: PublicKey;
+    let userAccount: web3.PublicKey;
     try {
-      userAccount = new PublicKey(body.account);
+      userAccount = new web3.PublicKey(body.account);
     } catch (error) {
       return res.status(400).json({ error: 'Invalid account' });
     }
@@ -477,19 +398,19 @@ app.post('/post_action', async (req: Request, res: Response) => {
     const connection = await createNewConnection(QUICKNODE_RPC);
     
     // Prepare transaction
-    const transaction = new Transaction();
+    const transaction = new web3.Transaction();
 
     // Get the latest blockhash
     const { blockhash } = await connection.getLatestBlockhash();
 
     // Get fee details
     const mintingFee = await getFeeInLamports();
-    const mintingFeeSOL = mintingFee / LAMPORTS_PER_SOL;
+    const mintingFeeSOL = mintingFee / web3.LAMPORTS_PER_SOL;
     console.log(`Fee for this transaction -> ${mintingFee} lamports or ${mintingFeeSOL} SOL.`);
 
     // Add payment instruction
     transaction.add(
-      SystemProgram.transfer({
+      web3.SystemProgram.transfer({
         fromPubkey: userAccount,
         toPubkey: mintKeypair.publicKey,
         lamports: mintingFee,
@@ -498,7 +419,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
     // Add memo instruction
     transaction.add(
-      new TransactionInstruction({
+      new web3.TransactionInstruction({
         keys: [],
         programId: MEMO_PROGRAM_ID,
         data: Buffer.from(memo, 'utf-8'),
@@ -506,15 +427,15 @@ app.post('/post_action', async (req: Request, res: Response) => {
     );
 
     // Set computational resources for transaction
-    transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 20_000 }));
-    transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100 }));
+    transaction.add(web3.ComputeBudgetProgram.setComputeUnitLimit({ units: 20_000 }));
+    transaction.add(web3.ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100 }));
 
     // Finalize transaction details
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = userAccount;
 
     // Create payload
-    const payload: ActionPostResponse = await createPostResponse({
+    const payload: actions.ActionPostResponse = await actions.createPostResponse({
       fields: {
         transaction: transaction,
         message: 'Your NFT is on the way! Wait a few minutes then check your wallet.',
@@ -536,7 +457,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
   }
 });
 
-async function processPostTransaction(prompt: string, connection: Connection, user_account:PublicKey, memo:string, pre_memo:string, randomNumber: number) {
+async function processPostTransaction(prompt: string, connection: web3.Connection, user_account: web3.PublicKey, memo:string, pre_memo:string, randomNumber: number) {
 
   const transactionSignature = await findTransactionWithMemo(connection, user_account, memo);
 
@@ -572,7 +493,7 @@ async function processPostTransaction(prompt: string, connection: Connection, us
       const newAssetAddress = await createAsset(CONFIG, uri);
 
       console.log(`Transferring your NFT 📬`);
-      await transferNFT(new PublicKey(newAssetAddress), user_account);
+      await transferNFT(new web3.PublicKey(newAssetAddress), user_account);
   
       console.log("Process completed successfully!");
 
@@ -586,7 +507,7 @@ async function processPostTransaction(prompt: string, connection: Connection, us
   }
 }
 
-async function transferNFT(newAssetAddress: PublicKey, user_account: PublicKey) {
+async function transferNFT(newAssetAddress: web3.PublicKey, user_account: web3.PublicKey) {
   try {
     const result = await transferV1(umi, {
       asset: publicKey(newAssetAddress),
@@ -600,6 +521,13 @@ async function transferNFT(newAssetAddress: PublicKey, user_account: PublicKey) 
     throw error;
   }
 }
+
+// Start dev server
+// const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
+// app.listen(port, () => {
+//   console.log(`Listening at http://localhost:${port}/`);
+//   console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/`)
+// });
 
 // Start prod server
 const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;

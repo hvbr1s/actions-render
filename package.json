@@ -48,7 +48,7 @@
         "start:prod": "node dist/app.js",
         "build": "tsc",
         "eject": "react-scripts eject",
-        "dev": "tsx ./src/dev.ts"
+        "dev": "tsx ./src/app.ts"
     },
     "eslintConfig": {
         "extends": [
