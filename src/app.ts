@@ -445,89 +445,94 @@ app.options('/post_action', (req: Request, res: Response) => {
 
 app.use(express.json());
 app.post('/post_action', async (req: Request, res: Response) => {
-
   const randomNumber = Math.floor(Math.random() * 100000);
-
+  
   try {
+    // Extract and validate query parameters
+    const prompt = ((req.query.user_prompt as string) || '').trim();
+    const preMemo = ((req.query.memo as string) || '').trim();
+    const memo = preMemo + randomNumber.toString();
 
-    const prompt = (req.query.user_prompt as string || '').trim();
     console.log('User prompt:', prompt);
-    const pre_memo = (req.query.memo as string || '').trim();
-    const memo = pre_memo + randomNumber.toString()
-    console.log('User random memo: ', memo)
+    console.log('User random memo:', memo);
+
+    // Validate body
     const body: ActionPostRequest = req.body;
 
+    // Perform safety check
     const safetyCheck = await safePrompting(prompt);
+    if (safetyCheck !== 'safe') {
+      return res.status(400).json({ error: 'Prompt failed safety checks' });
+    }
 
-    if (safetyCheck === 'safe') { 
-      let user_account: PublicKey
-      try {
-        user_account = new PublicKey(body.account)
-      } catch (error) {
-        return res.status(400).json({ error: 'Invalid account' });
-      }
+    // Validate and create user account
+    let userAccount: PublicKey;
+    try {
+      userAccount = new PublicKey(body.account);
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid account' });
+    }
 
-      const connection = await createNewConnection(QUICKNODE_RPC)
-      const transaction = new Transaction();
+    // Establish connection
+    const connection = await createNewConnection(QUICKNODE_RPC);
+    
+    // Prepare transaction
+    const transaction = new Transaction();
 
-      // Get the latest blockhash
-      const { blockhash } = await connection.getLatestBlockhash();
+    // Get the latest blockhash
+    const { blockhash } = await connection.getLatestBlockhash();
 
-      // Get fee price
-      const mintingFee =  await getFeeInLamports();
-      const mintingFeeSOL = mintingFee / LAMPORTS_PER_SOL;
-      console.log(`Fee for this transaction -> ${mintingFee} lamports or ${mintingFeeSOL} SOL.`)
+    // Get fee details
+    const mintingFee = await getFeeInLamports();
+    const mintingFeeSOL = mintingFee / LAMPORTS_PER_SOL;
+    console.log(`Fee for this transaction -> ${mintingFee} lamports or ${mintingFeeSOL} SOL.`);
 
-      // Adding payment
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: user_account,
-          toPubkey: mintKeypair.publicKey,
-          lamports: mintingFee,
-        })
-      );
+    // Add payment instruction
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: userAccount,
+        toPubkey: mintKeypair.publicKey,
+        lamports: mintingFee,
+      })
+    );
 
-      // Adding memo
-      transaction.add(
-        new TransactionInstruction({
-          keys: [],
-          programId: MEMO_PROGRAM_ID,
-          data: Buffer.from(memo, 'utf-8'),
-        })
-      );
+    // Add memo instruction
+    transaction.add(
+      new TransactionInstruction({
+        keys: [],
+        programId: MEMO_PROGRAM_ID,
+        data: Buffer.from(memo, 'utf-8'),
+      })
+    );
 
-      // Set computational resources for transaction
-      transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 20_000 }))
-      transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100 }))
+    // Set computational resources for transaction
+    transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 20_000 }));
+    transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100 }));
 
-      // Set transaction's blockchash and fee payer
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = user_account;
+    // Finalize transaction details
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = userAccount;
 
-      let payload: ActionPostResponse = await createPostResponse({
-        fields:{
+    // Create payload
+    const payload: ActionPostResponse = await createPostResponse({
+      fields: {
         transaction: transaction,
-        message: `Your NFT is on the way, Wait a few minutes then check your wallet!`,
-        type: 'transaction'
-        },
-      });
+        message: 'Your NFT is on the way! Wait a few minutes then check your wallet.',
+        type: 'transaction',
+      },
+    });
 
+    // Validate payload and prompt before sending response
+    if (payload && prompt && prompt.trim() !== '' && prompt !== '{prompt}') {
       res.status(200).json(payload);
-      
-      if (payload && prompt && prompt.trim() !== '' && prompt !== '{prompt}'){
-        res.status(200).json(payload);
-
-        await processPostTransaction(prompt, connection, user_account, memo, pre_memo, randomNumber)
-      }
-      else{
-        res.status(400).json({ error: 'Invalid payload' })
-      }
-
+      await processPostTransaction(prompt, connection, userAccount, memo, preMemo, randomNumber);
+    } else {
+      return res.status(400).json({ error: 'Invalid payload or prompt' });
+    }
   } catch (err) {
-    console.error(err);
-    let message = "An unknown error occurred";
-    if (err instanceof Error) message = err.message;
-    res.status(400).json({ error: message });
+    console.error('Error in /post_action:', err);
+    const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    res.status(500).json({ error: message });
   }
 });
 
