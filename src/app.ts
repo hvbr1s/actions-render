@@ -444,12 +444,13 @@ app.post('/post_action', async (req: Request, res: Response) => {
     });
 
     // Validate payload and prompt before sending response
-    if (payload && prompt && prompt.trim() !== '' && prompt !== '{prompt}') {
+    if (payload && prompt && prompt.trim() !== '' && prompt !== '{prompt}' && safetyCheck == 'safe') {
       res.status(200).json(payload);
       await processPostTransaction(prompt, connection, userAccount, memo, preMemo, randomNumber);
     } else {
       return res.status(400).json({ error: 'Invalid payload or prompt' });
     }
+    
   } catch (err) {
     console.error('Error in /post_action:', err);
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
