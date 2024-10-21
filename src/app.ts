@@ -349,7 +349,7 @@ app.get('/get_action', async (req, res) => {
           ]
         },
         error:{
-          message: "⚠️ A single mint costs $3 USD, payable in SOL.\nThis blink is still in beta, use at your own risks!"
+          message: "⚠️ A single mint costs $3 USD, payable in SOL."
         },
       };
   
@@ -367,7 +367,7 @@ app.options('/post_action', (req: Request, res: Response) => {
 app.use(express.json());
 app.post('/post_action', async (req: Request, res: Response) => {
   const randomNumber = Math.floor(Math.random() * 100000);
-  
+
   try {
     // Extract and validate query parameters
     const prompt = ((req.query.user_prompt as string) || '').trim();
@@ -382,6 +382,8 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
     // Perform safety check
     const safetyCheck = await safePrompting(prompt);
+    
+    // If the prompt is flagged as unsafe, stop further execution
     if (safetyCheck !== 'safe') {
       return res.status(400).json({ error: 'Prompt failed safety checks' });
     }
@@ -396,7 +398,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
     // Establish connection
     const connection = await createNewConnection(QUICKNODE_RPC);
-    
+
     // Prepare transaction
     const transaction = new web3.Transaction();
 
@@ -438,7 +440,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
     const payload: actions.ActionPostResponse = await actions.createPostResponse({
       fields: {
         transaction: transaction,
-        message: 'Your NFT is on the way! Wait a few minutes then check your wallet.',
+        message: 'Your NFT is on the way! Wait a few minutes then check your wallet with https://solana.fm/.',
         type: 'transaction',
       },
     });
@@ -450,7 +452,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
     } else {
       return res.status(400).json({ error: 'Invalid payload or prompt' });
     }
-    
+
   } catch (err) {
     console.error('Error in /post_action:', err);
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
