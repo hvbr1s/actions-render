@@ -11,8 +11,10 @@ export async function safePrompting(userPrompt: string): Promise<string> {
       console.log(moderation)
   
       if (moderation.results[0].flagged === true) {
+        console.log(`The prompt '${userPrompt}' is unsafe! 🚨`)
         return 'unsafe';
       } else {
+        console.log(`The prompt '${userPrompt}' is safe! 🟢`)
         return 'safe';
       }
     } catch (error) {
