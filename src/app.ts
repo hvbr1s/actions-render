@@ -1,6 +1,4 @@
 import * as fs from 'fs';
-import * as path from 'path';
-import axios from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
@@ -9,6 +7,8 @@ import { promises as promise } from 'fs';
 import { getFeeInLamports } from './utils/fee' 
 import { NFTConfig } from './utils/interfaces'
 import { safePrompting } from './utils/safety'
+import { imagine } from './utils/generateImage'
+import { createNewConnection } from './utils/createNewConnection'
 import * as actions from '@solana/actions'
 import * as web3 from '@solana/web3.js'
 import { MEMO_PROGRAM_ID } from '@solana/spl-memo';
@@ -48,14 +48,6 @@ const umi = newUMI
   .use(keypairIdentity(keypair));
 
 ///////////////
-
-// Solana connection handler
-async function createNewConnection(rpcUrl: string){
-  console.log(`Connecting to Solana...🔌`)
-  const connection = await new web3.Connection(rpcUrl)
-  console.log(`Connection to Solana established🔌✅`)
-  return connection;
-}
 
 ///// AI LOGIC
 const oai_client = new OpenAI({apiKey: process.env['OPENAI_API_KEY']});
@@ -214,44 +206,6 @@ try {
   console.error("Error in createURI:", error);
   throw error;
 }
-}
-
-async function imagine(userPrompt: string, CONFIG: NFTConfig, randomNumber: number) {
-
-  try{
-
-    const response = await oai_client.images.generate({
-      model: "dall-e-3",
-      prompt: userPrompt + ' . Begin!',
-      n: 1,
-      size: "1024x1024",
-      quality:'standard' // OR 'hd'
-    });
-    const imageUrl = response.data[0].url;
-
-    // Fetch the image from the URL
-    const imageResponse = await axios({
-      url: imageUrl,
-      method: 'GET',
-      responseType: 'arraybuffer'
-    });
-
-    const imagePath = path.join(CONFIG.uploadPath, `${CONFIG.imgName}_${randomNumber}.png`);
-
-    // Ensure the directory exists
-    fs.mkdirSync(path.dirname(imagePath), { recursive: true });
-
-    // Write the image data to a file
-    await fs.promises.writeFile(imagePath, imageResponse.data);
-    console.log(imagePath)
-
-    return imagePath;
-    
-  } catch (error) {
-    console.error("Error in createImage:", error);
-    throw error;
-  }
-
 }
 
 async function createAsset(CONFIG: NFTConfig, uri: string): Promise<string> {
