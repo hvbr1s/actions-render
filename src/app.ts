@@ -13,10 +13,9 @@ import * as actions from '@solana/actions'
 import * as web3 from '@solana/web3.js'
 import { MEMO_PROGRAM_ID } from '@solana/spl-memo';
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
-import { publicKey, createGenericFile, } from '@metaplex-foundation/umi';
+import { publicKey, createGenericFile, keypairIdentity, generateSigner } from '@metaplex-foundation/umi';
 import { mplCore, transferV1, create } from '@metaplex-foundation/mpl-core';
 import { irysUploader } from '@metaplex-foundation/umi-uploader-irys';
-import { keypairIdentity, generateSigner } from '@metaplex-foundation/umi';
 
 // Load environment variable
 dotenv.config();
