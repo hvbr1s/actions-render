@@ -393,7 +393,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
     const payload: actions.ActionPostResponse = await actions.createPostResponse({
       fields: {
         transaction: transaction,
-        message: 'Your NFT is on the way! Wait a few minutes then check your wallet with https://solana.fm/.',
+        message: 'Your NFT is on the way! Please WAIT A FEW MINUTES then check your wallet.',
         type: 'transaction',
       },
     });
