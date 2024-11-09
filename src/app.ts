@@ -521,7 +521,7 @@ async function transferNFT(newAssetAddress: web3.PublicKey, user_account: web3.P
 const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${port}`);
-  console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/`)
+  console.log(`Mint your blinks at https://dial.to/?action=solana-action%3Ahttps%3A%2F%2Factions-55pw.onrender.com%2Fget_action&cluster=mainnet`)
 });
 
 export default app;
