@@ -8,7 +8,6 @@ const oai_client = new OpenAI({apiKey: process.env['OPENAI_API_KEY']});
 export async function safePrompting(userPrompt: string): Promise<string> {
     try {
       const moderation = await oai_client.moderations.create({ input: userPrompt });
-      console.log(moderation)
   
       if (moderation.results[0].flagged === true) {
         console.log(`The prompt '${userPrompt}' is unsafe! 🚨`)
