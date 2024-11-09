@@ -486,7 +486,7 @@ async function processPostTransaction(prompt: string, connection: web3.Connectio
 async function transferNFT(newAssetAddress: web3.PublicKey, user_account: web3.PublicKey, gift: web3.PublicKey) {
   try {
 
-    if (gift && gift.toString() !== web3.PublicKey.default.toString()) {
+    if (gift && gift.toString() !== user_account.toString()) {
       const result = await transferV1(umi, {
         asset: publicKey(newAssetAddress),
         newOwner: publicKey(gift)
