@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import express, { Request, Response } from 'express';
+import express, { query, Request, Response } from 'express';
 import OpenAI from 'openai';
 import { promises as promise } from 'fs';
 import { getFeeInLamports } from './utils/fee' 
@@ -284,8 +284,8 @@ app.get('/get_action', async (req, res) => {
             {
               type: "transaction",
               label: "Mint NFT",
-              href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}`, // prod href
-              //href: `http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}`, // dev href
+              //href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}&gift={gift}`, // prod href
+              href: `http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}&gift={gift}`, // dev href
               parameters: [
                 {
                   name: "prompt",
@@ -296,6 +296,11 @@ app.get('/get_action', async (req, res) => {
                   name: "memo",
                   label: "Add a personal note",
                   required: true,
+                },
+                {
+                  name: "gift",
+                  label: "Gift the NFT to this address",
+                  required: false,
                 }
               ]
             }
@@ -322,16 +327,31 @@ app.post('/post_action', async (req: Request, res: Response) => {
   const randomNumber = Math.floor(Math.random() * 100000);
 
   try {
+
+    // Validate body
+    const body: actions.ActionPostRequest = req.body;
+    
     // Extract and validate query parameters
     const prompt = ((req.query.user_prompt as string) || '').trim();
     const preMemo = ((req.query.memo as string) || '').trim();
     const memo = preMemo + randomNumber.toString();
+    let giftPubKey : web3.PublicKey
+
+    if (req.query.gift && req.query.gift != null) {
+
+      giftPubKey =  new web3.PublicKey((req.query.gift as string).trim())
+
+    }
+    else{
+
+      giftPubKey = new web3.PublicKey(body.account)
+
+    }
+
 
     console.log('User prompt:', prompt);
     console.log('User random memo:', memo);
-
-    // Validate body
-    const body: actions.ActionPostRequest = req.body;
+    console.log('Optional gift recipient: ', giftPubKey.toString())
 
     // Perform safety check
     const safetyCheck = await safePrompting(prompt);
@@ -401,7 +421,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
     // Validate payload and prompt before sending response
     if (payload && prompt && prompt.trim() !== '' && prompt !== '{prompt}' && safetyCheck == 'safe') {
       res.status(200).json(payload);
-      await processPostTransaction(prompt, connection, userAccount, memo, preMemo, randomNumber);
+      await processPostTransaction(prompt, connection, userAccount, memo, preMemo, randomNumber, giftPubKey);
     } else {
       return res.status(400).json({ error: 'Invalid payload or prompt' });
     }
@@ -413,7 +433,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
   }
 });
 
-async function processPostTransaction(prompt: string, connection: web3.Connection, user_account: web3.PublicKey, memo:string, pre_memo:string, randomNumber: number) {
+async function processPostTransaction(prompt: string, connection: web3.Connection, user_account: web3.PublicKey, memo:string, pre_memo:string, randomNumber: number, gift: web3.PublicKey) {
 
   const transactionSignature = await findTransactionWithMemo(connection, user_account, memo);
 
@@ -449,7 +469,7 @@ async function processPostTransaction(prompt: string, connection: web3.Connectio
       const newAssetAddress = await createAsset(CONFIG, uri);
 
       console.log(`Transferring your NFT 📬`);
-      await transferNFT(new web3.PublicKey(newAssetAddress), user_account);
+      await transferNFT(new web3.PublicKey(newAssetAddress), user_account, gift);
   
       console.log("Process completed successfully!");
 
@@ -463,15 +483,27 @@ async function processPostTransaction(prompt: string, connection: web3.Connectio
   }
 }
 
-async function transferNFT(newAssetAddress: web3.PublicKey, user_account: web3.PublicKey) {
+async function transferNFT(newAssetAddress: web3.PublicKey, user_account: web3.PublicKey, gift: web3.PublicKey) {
   try {
-    const result = await transferV1(umi, {
-      asset: publicKey(newAssetAddress),
-      newOwner: publicKey(user_account)
-    }).sendAndConfirm(umi);
 
-    console.log(`NFT transferred to user: ${user_account}`);
-    return result.signature;
+    if (gift && gift.toString() !== web3.PublicKey.default.toString()) {
+      const result = await transferV1(umi, {
+        asset: publicKey(newAssetAddress),
+        newOwner: publicKey(gift)
+      }).sendAndConfirm(umi);
+
+      console.log(`NFT gifted to: ${gift.toString()}`);
+      return result.signature;
+    } else {
+      const result = await transferV1(umi, {
+        asset: publicKey(newAssetAddress),
+        newOwner: publicKey(user_account)
+      }).sendAndConfirm(umi);
+
+      console.log(`NFT transferred to user: ${user_account.toString()}`);
+      return result.signature;
+    }
+
   } catch (error) {
     console.error('Error transferring NFT to user:', error);
     throw error;
@@ -479,17 +511,17 @@ async function transferNFT(newAssetAddress: web3.PublicKey, user_account: web3.P
 }
 
 // Start dev server
-// const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
-// app.listen(port, () => {
-//   console.log(`Listening at http://localhost:${port}/`);
-//   console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/`)
-// });
+const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
+app.listen(port, () => {
+  console.log(`Listening at http://localhost:${port}/`);
+  console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/`)
+});
 
 // Start prod server
-const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Server is running on http://0.0.0.0:${port}`);
-  console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/`)
-});
+// const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
+// app.listen(port, '0.0.0.0', () => {
+//   console.log(`Server is running on http://0.0.0.0:${port}`);
+//   console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/`)
+// });
 
 export default app;
