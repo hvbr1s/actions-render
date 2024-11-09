@@ -284,8 +284,8 @@ app.get('/get_action', async (req, res) => {
             {
               type: "transaction",
               label: "Mint NFT",
-              //href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}&gift={gift}`, // prod href
-              href: `http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}&gift={gift}`, // dev href
+              href: `https://actions-55pw.onrender.com/post_action?user_prompt={prompt}&memo={memo}&gift={gift}`, // prod href
+              //href: `http://localhost:8000/post_action?user_prompt={prompt}&memo={memo}&gift={gift}`, // dev href
               parameters: [
                 {
                   name: "prompt",
@@ -299,7 +299,7 @@ app.get('/get_action', async (req, res) => {
                 },
                 {
                   name: "gift",
-                  label: "Gift the NFT to this address",
+                  label: "Gift the NFT to this address (optional)",
                   required: false,
                 }
               ]
@@ -330,7 +330,7 @@ app.post('/post_action', async (req: Request, res: Response) => {
 
     // Validate body
     const body: actions.ActionPostRequest = req.body;
-    
+
     // Extract and validate query parameters
     const prompt = ((req.query.user_prompt as string) || '').trim();
     const preMemo = ((req.query.memo as string) || '').trim();
@@ -511,17 +511,17 @@ async function transferNFT(newAssetAddress: web3.PublicKey, user_account: web3.P
 }
 
 // Start dev server
-const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
-app.listen(port, () => {
-  console.log(`Listening at http://localhost:${port}/`);
-  console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/`)
-});
+// const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
+// app.listen(port, () => {
+//   console.log(`Listening at http://localhost:${port}/`);
+//   console.log(`Test your blinks http://localhost:${port}/get_action \n at https://www.dial.to/`)
+// });
 
 // Start prod server
-// const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
-// app.listen(port, '0.0.0.0', () => {
-//   console.log(`Server is running on http://0.0.0.0:${port}`);
-//   console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/`)
-// });
+const port: number = process.env.PORT ? parseInt(process.env.PORT) : 8000;
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server is running on http://0.0.0.0:${port}`);
+  console.log(`Test your blinks https://actions-55pw.onrender.com/get_action \n at https://www.dial.to/`)
+});
 
 export default app;
